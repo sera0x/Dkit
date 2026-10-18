@@ -26,15 +26,19 @@ const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 //     so "stripped" degrades to dark-on-dark surfaces, not white-on-white.
 //   - <meta color-scheme> tells Apple Mail/Gmail this is already dark, which
 //     stops aggressive inversion (and darkens their light-mode canvas).
-//   - The hero image is the hosted logo with alt text; when images are
-//     blocked you still get a legible dark card with a white wordmark.
+//   - The header logo is the hosted lockup, which is drawn on pure black — it
+//     sits on a #000 row so there is no visible image box and no white band
+//     when images are blocked (alt text shows instead).
 //   - One <style> block for mobile only (@media); everything that matters is
 //     inline, and the query is purely additive.
+//   - mso-line-height-rule / mso-table-lspace keep Outlook from inflating
+//     line heights or adding phantom cell padding.
 //
 // Type and color: one sans-serif stack for prose (mono only for actual data
-// values), neon green #39ff88 reserved for the CTA and success states, red
-// for errors, near-white for headings and a light gray for body copy — both
-// measured against #161918 at >4.5:1.
+// values), neon #d4ff00 reserved for the CTA, #ff4d4d for alerts, near-white
+// for headings and light gray for body copy — every pair measured against its
+// own surface at 4.5:1 or better (body 10.5:1, muted 5.6:1, footer 4.8:1,
+// CTA label 17.1:1, alert 5.7:1).
 //
 // Every mail also carries a plain-text part: one-line intro, the code/link in
 // plain form, expiry. That's what spam filters read and what terminal
@@ -42,21 +46,29 @@ const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 // ---------------------------------------------------------------------------
 const FONT = `-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`
 const MONO = `'SF Mono', 'Menlo', 'Consolas', 'Courier New', monospace`
-const BG = '#0a0b0a'       // page background
-const SURFACE = '#161918'  // the card
-const PANEL = '#101312'    // inset panels: code blocks, detail rows
+const BG = '#0a0a0a'       // page background
+const HEADER = '#000000'   // logo row — matches the lockup's own black
+const SURFACE = '#1a1a1a'  // the card
+const PANEL = '#121212'    // inset panels: code blocks, detail rows
 const INK = '#ffffff'      // headings and strong text
-const BODY = '#c9cfcb'     // body copy — 11:1 on SURFACE
-const MUTED = '#8b948f'    // secondary copy, footnotes — 5.5:1 on SURFACE
-const LINE = '#2a2f2c'     // hairlines and card borders
-const ACCENT = '#39ff88'   // neon brand green: CTA background (black text on it)
-const GREEN = '#12b76a'    // success/UP status text
-const RED = '#ff6b5e'      // error/down
+const BODY = '#c9c9c9'     // body copy — 10.5:1 on SURFACE
+const MUTED = '#8a8a8a'    // secondary copy — 5.6:1 on SURFACE
+const FOOTER = '#7d7d7d'   // footer copy on BG — 4.8:1 (the brief's #666 is 3.4:1)
+const LINE = '#2a2a2a'     // hairlines and card borders
+const ACCENT = '#d4ff00'   // neon CTA background, black text on it
+const LINK = '#4ade80'     // inline links — green, not default blue
+const GREEN = '#34d399'    // success/UP status text
+const RED = '#ff4d4d'      // error/down
 const WHITE = '#ffffff'
-const HERO = `${APP_URL}/dkit-logo.png`   // 1408x768, served by the site
+const LOGO = `${APP_URL}/dkit-logo.png`   // 1408x768 lockup on black, served by the site
 
-function htmlShell({ title, introHtml, mainHtml, footnoteHtml, preheader }) {
+const UNSUBSCRIBE = 'mailto:unsubscribe@dkit.name.ng'   // real prefs page not built yet; a mailto is honest and works everywhere
+
+function htmlShell({ title, introHtml, mainHtml, footnoteHtml, preheader, signedInAs }) {
   const preheaderText = escapeHtml(preheader || title)
+  const signedIn = signedInAs
+    ? `<br />Signed in as <span style="color: ${MUTED};">${escapeHtml(signedInAs)}</span> &middot; <a href="${UNSUBSCRIBE}" style="color: ${FOOTER}; text-decoration: underline;">Unsubscribe</a>`
+    : `<br /><a href="${UNSUBSCRIBE}" style="color: ${FOOTER}; text-decoration: underline;">Unsubscribe</a>`
   return `<!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -69,37 +81,35 @@ function htmlShell({ title, introHtml, mainHtml, footnoteHtml, preheader }) {
 <style type="text/css">
   @media (max-width: 620px) {
     .wrap { width: 100% !important; }
-    .px { padding-left: 20px !important; padding-right: 20px !important; }
+    .px { padding-left: 16px !important; padding-right: 16px !important; }
+    .card { padding: 24px 18px !important; }
     h1 { font-size: 19px !important; line-height: 1.35 !important; }
     .body { font-size: 16px !important; }
-    .code { font-size: 26px !important; letter-spacing: 6px !important; }
+    .code { font-size: 25px !important; letter-spacing: 6px !important; }
+    .btn, .btn td { display: block !important; width: 100% !important; }
     .btn a { display: block !important; text-align: center !important; padding: 14px 20px !important; }
   }
 </style>
 </head>
 <body style="margin: 0; padding: 0; background: ${BG}; background-color: ${BG};">
 <div style="display: none; max-height: 0; overflow: hidden; mso-hide: all; font-size: 1px; line-height: 1px; color: ${BG};">${preheaderText}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BG}">
-<tr><td bgcolor="${BG}" align="center" class="px" style="padding: 32px 16px;">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="wrap" style="width: 100%; max-width: 600px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BG}" style="mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
+<tr><td bgcolor="${BG}" align="center" class="px" style="padding: 28px 16px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="wrap" style="width: 100%; max-width: 600px; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
 
-  <tr><td style="padding: 0 0 22px;">
-    <img src="${HERO}" width="600" alt="Dkit" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; border-radius: 12px 12px 0 0;" />
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${SURFACE}" style="background: linear-gradient(180deg, rgba(10,11,10,0) 0%, ${SURFACE} 100%); height: 44px;">
-      <tr><td height="44" bgcolor="${SURFACE}" style="height: 44px; line-height: 44px; font-size: 1px;">&nbsp;</td></tr>
-    </table>
+  <tr><td bgcolor="${HEADER}" align="center" style="background: ${HEADER}; padding: 26px 0 22px;">
+    <img src="${LOGO}" width="168" alt="Dkit" style="display: block; width: 168px; max-width: 100%; height: auto; border: 0;" />
   </td></tr>
 
-  <tr><td bgcolor="${SURFACE}" style="background: ${SURFACE}; border: 1px solid ${LINE}; border-top: 0; border-radius: 0 0 12px 12px; padding: 4px 26px 28px;">
-    <span style="font-family: ${FONT}; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: ${WHITE};">Dkit</span>
-    <h1 style="margin: 14px 0 14px; font-family: ${FONT}; font-size: 21px; line-height: 1.3; font-weight: 700; letter-spacing: -0.01em; color: ${INK};">${escapeHtml(title)}</h1>
+  <tr><td bgcolor="${SURFACE}" class="card" style="background: ${SURFACE}; border: 1px solid ${LINE}; border-radius: 8px; padding: 32px 26px;">
+    <h1 style="margin: 0 0 14px; mso-line-height-rule: exactly; font-family: ${FONT}; font-size: 21px; line-height: 1.3; font-weight: 700; letter-spacing: -0.01em; color: ${INK};">${escapeHtml(title)}</h1>
     ${introHtml}
     ${mainHtml}
   </td></tr>
 
   <tr><td style="padding: 22px 4px 4px;">
-    <p style="margin: 0; font-family: ${FONT}; font-size: 12px; line-height: 1.7; color: ${MUTED}; text-align: center;">
-      ${footnoteHtml}<br />&copy; ${YEAR} Dkit &middot; <a href="${APP_URL}" style="color: ${MUTED}; text-decoration: underline;">${APP_URL.replace(/^https?:\/\//, '')}</a>
+    <p style="margin: 0; mso-line-height-rule: exactly; font-family: ${FONT}; font-size: 12px; line-height: 1.7; color: ${FOOTER}; text-align: center;">
+      ${footnoteHtml}<br />&copy; ${YEAR} Dkit &middot; <a href="${APP_URL}" style="color: ${FOOTER}; text-decoration: underline;">${APP_URL.replace(/^https?:\/\//, '')}</a>${signedIn}
     </p>
   </td></tr>
 
@@ -110,7 +120,6 @@ function htmlShell({ title, introHtml, mainHtml, footnoteHtml, preheader }) {
 </html>`
 }
 
-// Codes are data, so they use mono — dark ink on a light tinted panel.
 // Codes are data: mono, on an inset panel with a hairline — reads like a
 // terminal chip without pretending to be a window chrome.
 const codeBlock = (code) => `
@@ -121,14 +130,14 @@ const codeBlock = (code) => `
 </div>`
 
 // The one place the neon accent is allowed to be loud: the primary action.
-// Near-black text on #39ff88 is 14.9:1 — the strongest contrast in the mail.
+// Near-black text on #d4ff00 is 17.1:1 — the strongest contrast in the mail.
 const linkButton = (url, label) => `
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="btn" style="margin: 22px 0;"><tr><td style="background: ${ACCENT}; border-radius: 8px;">
   <a href="${escapeHtml(url)}" style="display: inline-block; padding: 13px 30px; font-family: ${FONT}; font-size: 14px; font-weight: 700; color: #0a0b0a; text-decoration: none; border-radius: 8px;">${escapeHtml(label)}</a>
 </td></tr></table>`
 
-const p = (html) => `<p class="body" style="margin: 0 0 14px; font-family: ${FONT}; font-size: 15px; line-height: 1.6; color: ${BODY};">${html}</p>`
-const dim = (html) => `<p style="margin: 0 0 14px; font-family: ${FONT}; font-size: 12px; line-height: 1.6; color: ${MUTED};">${html}</p>`
+const p = (html) => `<p class="body" style="margin: 0 0 14px; mso-line-height-rule: exactly; font-family: ${FONT}; font-size: 15px; line-height: 1.6; color: ${BODY};">${html}</p>`
+const dim = (html) => `<p style="margin: 0 0 14px; mso-line-height-rule: exactly; font-family: ${FONT}; font-size: 12px; line-height: 1.6; color: ${MUTED};">${html}</p>`
 const strong = (html) => `<strong style="color: ${INK}; font-weight: 600;">${html}</strong>`
 
 // Label/value detail rows (uptime alerts): labels in muted sans, values in
@@ -161,6 +170,7 @@ function sendVerificationCode(email, code) {
   const html = htmlShell({
     title: 'Verify your email',
     preheader: `Code ${code} \u2014 expires in 10 minutes.`,
+    signedInAs: email,
     introHtml: p('Enter this code to finish creating your account.'),
     mainHtml: codeBlock(code) + dim('This code expires in 10 minutes.'),
     footnoteHtml: `If you didn't sign up for Dkit, ignore this email.`,
@@ -184,6 +194,7 @@ function sendLoginCode(email, code) {
   const html = htmlShell({
     title: 'Your login code',
     preheader: `Code ${code} \u2014 expires in 10 minutes.`,
+    signedInAs: email,
     introHtml: p('Use this code to finish signing in.'),
     mainHtml: codeBlock(code) + dim('This code expires in 10 minutes.'),
     footnoteHtml: `If you weren't signing in, ignore this email and your account stays as it was.`,
@@ -207,11 +218,12 @@ function sendPasswordResetEmail(email, resetUrl) {
   const html = htmlShell({
     title: 'Reset your password',
     preheader: 'One click sets a new password. The link expires in 30 minutes.',
+    signedInAs: email,
     introHtml: p('Use the button below to set a new password for ' + strong(escapeHtml(email)) + '.'),
     mainHtml:
       linkButton(resetUrl, 'Reset password') +
       dim('This link expires in 30 minutes and works once.') +
-      dim(`Button not working? Paste this into your browser:<br /><a href="${escapeHtml(resetUrl)}" style="color: ${BODY}; word-break: break-all;">${escapeHtml(resetUrl)}</a>`),
+      dim(`Button not working? Paste this into your browser:<br /><a href="${escapeHtml(resetUrl)}" style="color: ${LINK}; word-break: break-all;">${escapeHtml(resetUrl)}</a>`),
     footnoteHtml: `If you didn't request a reset, ignore this email and your password stays unchanged.`,
   })
   const text = [
@@ -233,6 +245,7 @@ function sendTeamInviteEmail(email, inviteUrl, { teamName = 'a team', inviterEma
   const html = htmlShell({
     title: `You've been invited to ${escapeHtml(teamName)}`,
     preheader: `Join ${teamName} on Dkit \u2014 the invite expires in 7 days.`,
+    signedInAs: email,
     introHtml: p(
       (inviterEmail ? strong(escapeHtml(inviterEmail)) + ' invited you' : `You've been invited`) +
       ` to join ${strong(escapeHtml(teamName))} on Dkit as ${strong(escapeHtml(role))}.`
@@ -271,6 +284,7 @@ function sendUptimeAlertEmail(email, { name, url, status, statusCode, error }) {
   const html = htmlShell({
     title,
     preheader: down ? `${name} is down \u2014 ${reason}.` : `${name} is back up.`,
+    signedInAs: email,
     introHtml: p(
       `<span style="font-family: ${FONT}; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: ${statusColor};">${statusLabel}</span><br />` +
       (down ? 'Your monitor is down' : 'Your monitor recovered') +
@@ -305,7 +319,9 @@ function sendUptimeAlertEmail(email, { name, url, status, statusCode, error }) {
 function sendWelcomeEmail(email) {
   const html = htmlShell({
     title: 'Welcome to Dkit',
-    introHtml: p('Your account is ready.'),
+    preheader: 'Your account is ready \u2014 create your first project.',
+    signedInAs: email,
+    introHtml: p('Your account is ready. Let\u2019s get started.'),
     mainHtml:
       linkButton(APP_URL + '/signup', 'Create your first project'),
     footnoteHtml: 'You are receiving this because someone signed up to Dkit with this address.',
@@ -329,8 +345,10 @@ function sendAdminBroadcastEmail(email, { subject, body }) {
     .join('')
   const html = htmlShell({
     title: subject,
+    preheader: 'A message from the Dkit team.',
     introHtml: paragraphs,
     mainHtml: '',
+    signedInAs: email,
     footnoteHtml: 'Sent by the Dkit team.',
   })
   const text = [subject, '', String(body || '').trim(), '', APP_URL].join('\n')

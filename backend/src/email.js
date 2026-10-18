@@ -26,9 +26,12 @@ const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 //     so "stripped" degrades to dark-on-dark surfaces, not white-on-white.
 //   - <meta color-scheme> tells Apple Mail/Gmail this is already dark, which
 //     stops aggressive inversion (and darkens their light-mode canvas).
-//   - The header is a text wordmark on a solid black row — no image, so it
-//     cannot be boxed, cropped or swallowed by image blocking, and there is
-//     no spacer band under it: the card starts where the header ends.
+//   - The header is a full-width hero (max 600px) whose bottom third is
+//     pre-faded into the page background inside the asset itself
+//     (public/dkit-email-hero.png) — a gradient that lives in the image can't
+//     be stripped by a client, so there is never a hard line nor an empty
+//     band, and the alt text still shows when images are blocked. The
+//     wordmark sits directly below it, on the page background.
 //   - Every text element carries its own inline color and the surfaces carry
 //     bgcolor attributes, so a client that strips <body>/meta handling still
 //     renders light text on dark surfaces — never white-on-white.
@@ -51,7 +54,6 @@ const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 const FONT = `-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`
 const MONO = `'SF Mono', 'Menlo', 'Consolas', 'Courier New', monospace`
 const BG = '#0a0a0a'       // page background
-const HEADER = '#000000'   // the wordmark row
 const SURFACE = '#1e1e1e'  // the card
 const PANEL = '#141414'    // inset panels: code blocks, detail rows
 const INK = '#ffffff'      // headings and strong text
@@ -64,6 +66,7 @@ const LINK = '#4ade80'     // inline links — green, not default blue
 const GREEN = '#34d399'    // success/UP status text
 const RED = '#ff4d4d'      // error/down
 const WHITE = '#ffffff'
+const HERO = `${APP_URL}/dkit-email-hero.png`   // 1408x768 lockup, bottom third pre-faded to #0a0a0a
 
 const UNSUBSCRIBE = 'mailto:unsubscribe@dkit.name.ng'   // real prefs page not built yet; a mailto is honest and works everywhere
 
@@ -100,6 +103,9 @@ function htmlShell({ title, introHtml, mainHtml, footnoteHtml, preheader, signed
     .btn, .btn td { display: block !important; width: 100% !important; }
     .btn a { display: block !important; text-align: center !important; padding: 14px 20px !important; }
   }
+  @media (hover: hover) {
+    .btn a:hover { background: #0a0a0a !important; color: ${ACCENT} !important; }
+  }
 </style>
 </head>
 <body style="margin: 0; padding: 0; background: ${BG}; background-color: ${BG};">
@@ -108,8 +114,12 @@ function htmlShell({ title, introHtml, mainHtml, footnoteHtml, preheader, signed
 <tr><td bgcolor="${BG}" align="center" class="px" style="padding: 28px 16px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="wrap" style="width: 100%; max-width: 600px; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
 
-  <tr><td bgcolor="${HEADER}" align="center" style="background: ${HEADER}; padding: 24px 0;">
-    <span style="font-family: ${FONT}; font-size: 21px; font-weight: 700; letter-spacing: -0.02em; color: ${WHITE};">Dkit</span>
+  <tr><td style="padding: 0;">
+    <img src="${HERO}" width="600" alt="Dkit" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0;" />
+  </td></tr>
+
+  <tr><td align="center" style="padding: 18px 0 14px;">
+    <span style="font-family: ${FONT}; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: ${WHITE};">Dkit</span>
   </td></tr>
 
   <tr><td bgcolor="${SURFACE}" class="card" style="background: ${SURFACE}; border: 1px solid ${LINE}; border-radius: 8px; padding: 32px 26px;">
@@ -144,7 +154,7 @@ const codeBlock = (code) => `
 // Near-black text on #d4ff00 is 17.1:1 — the strongest contrast in the mail.
 const linkButton = (url, label) => `
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="btn" style="margin: 22px 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt;"><tr><td style="background: ${ACCENT}; border-radius: 6px;">
-  <a href="${escapeHtml(url)}" style="display: inline-block; padding: 12px 28px; font-family: ${FONT}; font-size: 14px; font-weight: 700; color: #0a0a0a; text-decoration: none; border-radius: 6px;">${escapeHtml(label)}</a>
+  <a href="${escapeHtml(url)}" style="display: inline-block; background: ${ACCENT}; padding: 12px 28px; font-family: ${FONT}; font-size: 14px; font-weight: 700; color: #0a0a0a; text-decoration: none; border-radius: 6px;">${escapeHtml(label)}</a>
 </td></tr></table>`
 
 // Inline text links: brand green with an underline — never default blue.

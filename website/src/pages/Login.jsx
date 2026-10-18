@@ -51,7 +51,9 @@ export default function Login({ onNavigate }) {
     try {
       const data = await api.loginInitiate(email, password);
       setLoginToken(data.login_token);
-      setStep('code');
+      // 2FA accounts get an authenticator challenge — no email is sent by the
+      // server for them, so never show the 'code we emailed you' screen.
+      setStep(data.two_factor ? 'twofa' : 'code');
     } catch (err) {
       if (err.status === 403) { goTo('/suspended'); return; }
       setError(err.message || 'Login failed');

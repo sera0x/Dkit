@@ -203,9 +203,11 @@ app.post('/api/auth/login/verify', loginLimiter, async (req, res) => {
 const { login_token, code } = req.body
 if (!login_token || !code) return res.status(400).json({ error: 'Login token and code required' })
 // Two-factor challenge: login_token matches a pending challenge and code is
-// an authenticator code or a recovery code. One-shot: the challenge row is
-// consumed the moment it resolves, valid or not.
-const challenge = await pool.query('DELETE FROM login_challenges WHERE login_token = $1 AND expires_at > NOW() RETURNING user_id', [login_token])
+// an authenticator code or a recovery code. A wrong code keeps the challenge
+// alive so the user can retry inside the 10-minute window (the row is only
+// consumed on success — still one-shot against replay). Brute force stays
+// bounded by loginLimiter and by initiate requiring the real password.
+const challenge = await pool.query('SELECT user_id FROM login_challenges WHERE login_token = $1 AND expires_at > NOW()', [login_token])
 if (challenge.rows.length > 0) {
   const uid = challenge.rows[0].user_id
   const u = await pool.query('SELECT id, email, suspended, totp_secret FROM users WHERE id = $1', [uid])
@@ -219,6 +221,8 @@ if (challenge.rows.length > 0) {
     ok = rc.rows.length > 0
   }
   if (!ok) return res.status(400).json({ error: 'Invalid or expired code' })
+  const claimed = await pool.query('DELETE FROM login_challenges WHERE login_token = $1 AND expires_at > NOW() RETURNING user_id', [login_token])
+  if (claimed.rows.length === 0) return res.status(400).json({ error: 'Invalid or expired code' })
   const token = generateToken(uid)
   const refreshToken = newRefreshToken()
   await pool.query('INSERT INTO sessions (user_id, refresh_hash, user_agent, last_ip) VALUES ($1, $2, $3, $4)', [uid, hashRefreshToken(refreshToken), String(req.headers['user-agent'] || '').slice(0, 300), clientIp(req)])
@@ -1488,7 +1492,9 @@ app.use((req, res, next) => { if (req.path.startsWith('/api/')) return next(); r
   jobs.startJobs()             // cron scheduler + monitor prober + log retention
   await status.ensureSeed()    // status page: API/Website/Docs services
   status.startStatusProbes()   // status page prober + uptime rollups
-  app.listen(PORT, () => {
+  // Bind to loopback only: the Cloudflare tunnel reaches us via localhost, so
+  // port 3001 is never directly reachable from the internet.
+  app.listen(PORT, '127.0.0.1', () => {
     console.log('Dkit API running on port ' + PORT)
     console.log('http://localhost:' + PORT + '/api/health')
   })

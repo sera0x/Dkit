@@ -2,6 +2,7 @@
 set -eu
 
 REPO="${DKIT_REPO:-sera0x/Dkit}"
+# To ship a release: tag the commit (v0.1.0), build the tarball with
 BUNDLE="dkit-cli"
 
 fail() {
@@ -38,9 +39,6 @@ base_url="${DKIT_RELEASES_URL:-https://github.com/$REPO/releases/download/$tag}"
 
 archive="${BUNDLE}-${ver}.tar.gz"
 
-# The bundle (with its dependencies, so npm is not needed) lands under a lib
-# directory and a `dkit` symlink goes into a bin directory. Termux has its
-# own prefix with bin already on PATH, so both pieces go under $PREFIX there.
 if [ -n "${DKIT_INSTALL_DIR:-}" ]; then
   root_dir="$DKIT_INSTALL_DIR/$BUNDLE"
   bin_dir="$DKIT_INSTALL_DIR/bin"
@@ -62,7 +60,7 @@ curl -fsSL "$base_url/checksums.txt" -o "$work/checksums.txt" \
   || fail "couldn't download checksums.txt for $tag"
 
 echo "dkit: verifying checksum..."
-expected=$(grep " $archive\$" "$work/checksums.txt" | awk '{print $1}')
+expected=$(grep " $archive$" "$work/checksums.txt" | awk '{print $1}')
 [ -n "$expected" ] || fail "no checksum entry found for $archive"
 if command -v sha256sum >/dev/null 2>&1; then
   actual=$(sha256sum "$work/$archive" | awk '{print $1}')
@@ -76,7 +74,6 @@ fi
 tar -xzf "$work/$archive" -C "$work"
 
 mkdir -p "$(dirname "$root_dir")" "$bin_dir"
-# Replace only the bundle directory, never the parent the user pointed at.
 rm -rf "$root_dir"
 mv "$work/$BUNDLE" "$root_dir"
 chmod +x "$root_dir/bin/dkit.js"

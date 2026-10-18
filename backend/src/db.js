@@ -15,6 +15,10 @@ password: process.env.DB_PASSWORD,
 port: process.env.DB_PORT || 5432,
 })
 const redisClient = redis.createClient({ url: 'redis://localhost:6379' })
+// A restarted/idle-dropped Postgres kills pooled connections; the pool then
+// emits 'error', and with no listener that crashes the whole API (site 502s
+// until systemd restarts it). Log it and let the pool self-heal instead.
+pool.on('error', (err) => console.error('Idle DB client error:', err && err.message))
 redisClient.connect().catch(err => console.error('Redis connect failed:', err))
 async function initDB() {
 await pool.query(`CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW())`)

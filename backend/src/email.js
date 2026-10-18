@@ -115,7 +115,7 @@ function htmlShell({ title, introHtml, mainHtml, footnoteHtml, preheader, signed
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="wrap" style="width: 100%; max-width: 600px; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
 
   <tr><td style="padding: 0;">
-    <img src="${HERO}" width="600" alt="Dkit" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0;" />
+    <img src="${HERO}" width="600" alt="Dkit" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0; border-radius: 12px;" />
   </td></tr>
 
   <tr><td align="center" style="padding: 18px 0 14px;">

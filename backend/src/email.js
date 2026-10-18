@@ -26,11 +26,15 @@ const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 //     so "stripped" degrades to dark-on-dark surfaces, not white-on-white.
 //   - <meta color-scheme> tells Apple Mail/Gmail this is already dark, which
 //     stops aggressive inversion (and darkens their light-mode canvas).
-//   - The header logo is the hosted lockup, which is drawn on pure black — it
-//     sits on a #000 row so there is no visible image box and no white band
-//     when images are blocked (alt text shows instead).
-//   - One <style> block for mobile only (@media); everything that matters is
-//     inline, and the query is purely additive.
+//   - The header is a text wordmark on a solid black row — no image, so it
+//     cannot be boxed, cropped or swallowed by image blocking, and there is
+//     no spacer band under it: the card starts where the header ends.
+//   - Every text element carries its own inline color and the surfaces carry
+//     bgcolor attributes, so a client that strips <body>/meta handling still
+//     renders light text on dark surfaces — never white-on-white.
+//   - A conditional-comment <style> covers Windows Outlook only (line
+//     spacing, image interpolation, pixel density); everything else is
+//     inline, and the @media query is purely additive.
 //   - mso-line-height-rule / mso-table-lspace keep Outlook from inflating
 //     line heights or adding phantom cell padding.
 //
@@ -47,9 +51,9 @@ const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 const FONT = `-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`
 const MONO = `'SF Mono', 'Menlo', 'Consolas', 'Courier New', monospace`
 const BG = '#0a0a0a'       // page background
-const HEADER = '#000000'   // logo row — matches the lockup's own black
-const SURFACE = '#1a1a1a'  // the card
-const PANEL = '#121212'    // inset panels: code blocks, detail rows
+const HEADER = '#000000'   // the wordmark row
+const SURFACE = '#1e1e1e'  // the card
+const PANEL = '#141414'    // inset panels: code blocks, detail rows
 const INK = '#ffffff'      // headings and strong text
 const BODY = '#c9c9c9'     // body copy — 10.5:1 on SURFACE
 const MUTED = '#8a8a8a'    // secondary copy — 5.6:1 on SURFACE
@@ -60,7 +64,6 @@ const LINK = '#4ade80'     // inline links — green, not default blue
 const GREEN = '#34d399'    // success/UP status text
 const RED = '#ff4d4d'      // error/down
 const WHITE = '#ffffff'
-const LOGO = `${APP_URL}/dkit-logo.png`   // 1408x768 lockup on black, served by the site
 
 const UNSUBSCRIBE = 'mailto:unsubscribe@dkit.name.ng'   // real prefs page not built yet; a mailto is honest and works everywhere
 
@@ -78,6 +81,14 @@ function htmlShell({ title, introHtml, mainHtml, footnoteHtml, preheader, signed
 <meta name="color-scheme" content="dark light" />
 <meta name="supported-color-schemes" content="dark light" />
 <title>${escapeHtml(title)}</title>
+<!--[if mso]>
+<style type="text/css">
+  table, td, div, p, a { font-family: Arial, Helvetica, sans-serif !important; }
+  table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+  img { -ms-interpolation-mode: bicubic; }
+  .code { font-size: 30px !important; letter-spacing: 9px !important; }
+</style>
+<![endif]-->
 <style type="text/css">
   @media (max-width: 620px) {
     .wrap { width: 100% !important; }
@@ -97,8 +108,8 @@ function htmlShell({ title, introHtml, mainHtml, footnoteHtml, preheader, signed
 <tr><td bgcolor="${BG}" align="center" class="px" style="padding: 28px 16px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="wrap" style="width: 100%; max-width: 600px; mso-table-lspace: 0pt; mso-table-rspace: 0pt;">
 
-  <tr><td bgcolor="${HEADER}" align="center" style="background: ${HEADER}; padding: 26px 0 22px;">
-    <img src="${LOGO}" width="168" alt="Dkit" style="display: block; width: 168px; max-width: 100%; height: auto; border: 0;" />
+  <tr><td bgcolor="${HEADER}" align="center" style="background: ${HEADER}; padding: 24px 0;">
+    <span style="font-family: ${FONT}; font-size: 21px; font-weight: 700; letter-spacing: -0.02em; color: ${WHITE};">Dkit</span>
   </td></tr>
 
   <tr><td bgcolor="${SURFACE}" class="card" style="background: ${SURFACE}; border: 1px solid ${LINE}; border-radius: 8px; padding: 32px 26px;">
@@ -132,9 +143,12 @@ const codeBlock = (code) => `
 // The one place the neon accent is allowed to be loud: the primary action.
 // Near-black text on #d4ff00 is 17.1:1 — the strongest contrast in the mail.
 const linkButton = (url, label) => `
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" class="btn" style="margin: 22px 0;"><tr><td style="background: ${ACCENT}; border-radius: 8px;">
-  <a href="${escapeHtml(url)}" style="display: inline-block; padding: 13px 30px; font-family: ${FONT}; font-size: 14px; font-weight: 700; color: #0a0b0a; text-decoration: none; border-radius: 8px;">${escapeHtml(label)}</a>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" class="btn" style="margin: 22px 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt;"><tr><td style="background: ${ACCENT}; border-radius: 6px;">
+  <a href="${escapeHtml(url)}" style="display: inline-block; padding: 12px 28px; font-family: ${FONT}; font-size: 14px; font-weight: 700; color: #0a0a0a; text-decoration: none; border-radius: 6px;">${escapeHtml(label)}</a>
 </td></tr></table>`
+
+// Inline text links: brand green with an underline — never default blue.
+const link = (url, label) => `<a href="${escapeHtml(url)}" style="color: ${LINK}; text-decoration: underline;">${escapeHtml(label || url)}</a>`
 
 const p = (html) => `<p class="body" style="margin: 0 0 14px; mso-line-height-rule: exactly; font-family: ${FONT}; font-size: 15px; line-height: 1.6; color: ${BODY};">${html}</p>`
 const dim = (html) => `<p style="margin: 0 0 14px; mso-line-height-rule: exactly; font-family: ${FONT}; font-size: 12px; line-height: 1.6; color: ${MUTED};">${html}</p>`
@@ -247,7 +261,7 @@ function sendTeamInviteEmail(email, inviteUrl, { teamName = 'a team', inviterEma
     preheader: `Join ${teamName} on Dkit \u2014 the invite expires in 7 days.`,
     signedInAs: email,
     introHtml: p(
-      (inviterEmail ? strong(escapeHtml(inviterEmail)) + ' invited you' : `You've been invited`) +
+      (inviterEmail ? link('mailto:' + inviterEmail, inviterEmail) : `You've been invited`) +
       ` to join ${strong(escapeHtml(teamName))} on Dkit as ${strong(escapeHtml(role))}.`
     ),
     mainHtml:

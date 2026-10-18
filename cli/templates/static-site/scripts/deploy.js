@@ -1,6 +1,6 @@
 // Deploy script for {{name}}. Swap the copy step for whatever actually
 // publishes your site (rsync, netlify, s3 sync — your call). What you get out
-// of the box: every deploy logs to D-Kit, so `dkit logs:tail -s deploy` is a
+// of the box: every deploy logs to Dkit, so `dkit logs:tail -s deploy` is a
 // history of every push.
 const { execSync } = require('child_process')
 const { log } = require('../src/dkit-logger')

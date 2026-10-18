@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "name": "node-api",
-  "description": "Zero-dependency Node HTTP API, wired to D-Kit (cron + logs ready)",
+  "description": "Zero-dependency Node HTTP API, wired to Dkit (cron + logs ready)",
   "features": ["secrets", "logs"],
   "envHints": ["DKIT_API_KEY"],
   "postScaffold": "npm install"

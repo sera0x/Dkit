@@ -1,7 +1,7 @@
 # {{Name}}
 
 Scaffolded with `dkit new --template node-api`. Zero runtime dependencies —
-plain Node. Secrets come from D-Kit at runtime: `npm run dev` runs through
+plain Node. Secrets come from Dkit at runtime: `npm run dev` runs through
 `dkit run`, so no `.env` file ever touches disk.
 
 ## Run it

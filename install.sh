@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-REPO="${DKIT_REPO:-sera0x/D-Kit}"
+REPO="${DKIT_REPO:-sera0x/Dkit}"
 BUNDLE="dkit-cli"
 
 fail() {

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "name": "express-pg",
-  "description": "Express 5 + Postgres, wired to D-Kit from birth (log drain included)",
+  "description": "Express 5 + Postgres, wired to Dkit from birth (log drain included)",
   "features": ["secrets", "logs"],
   "envHints": ["DATABASE_URL", "DKIT_API_KEY"],
   "postScaffold": "npm install"

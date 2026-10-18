@@ -102,8 +102,8 @@ await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended BOOLEAN D
 await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_ip TEXT`)
 await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP`)
 // Boot-time settings: the API fills any missing env var from the special
-// 'dkit-self' project (see loadSelfSettings in server.js). D-Kit configures
-// itself with D-Kit.
+// 'dkit-self' project (see loadSelfSettings in server.js). Dkit configures
+// itself with Dkit.
 await pool.query(`CREATE TABLE IF NOT EXISTS self_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMP DEFAULT NOW())`)
 // Two-factor auth (TOTP). The secret is stored as-is (obfuscating it client-side
 // would be theater — the server has to read it to derive codes); totp_enabled
@@ -219,7 +219,7 @@ await pool.query(`CREATE INDEX IF NOT EXISTS idx_logs_project_ts ON log_entries 
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_logs_project_level ON log_entries (project_id, level)`)
 
 // ---------------------------------------------------------------------------
-// Public status page (dkit.name.ng/status). D-Kit watches its own services
+// Public status page (dkit.name.ng/status). Dkit watches its own services
 // with the same prober that powers user monitors, but with admin control on
 // top: an admin can force a service up/down for maintenance and post incidents.
 // ---------------------------------------------------------------------------

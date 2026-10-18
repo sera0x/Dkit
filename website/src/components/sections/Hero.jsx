@@ -15,7 +15,7 @@ const copy = () => { navigator.clipboard?.writeText(INSTALL_CMD); setCopied(true
 const getStarted = () => { const target = user ? '/dashboard' : '/signup'; onNavigate ? onNavigate(target) : (window.location.href = target); };
 return (
 <section className="hero-section" id="top">
-<button className="navbar-brand hero-brand-btn" onClick={() => (onNavigate ? onNavigate("/") : (window.location.href = "/"))}><img src={logo} alt="D-Kit logo" className="navbar-logo" /><span>D-Kit</span></button>
+<button className="navbar-brand hero-brand-btn" onClick={() => (onNavigate ? onNavigate("/") : (window.location.href = "/"))}><img src={logo} alt="Dkit logo" className="navbar-logo" /><span>Dkit</span></button>
 <button className="cta-button ghost hero-account-btn" onClick={() => { const t = user ? "/dashboard" : "/login"; onNavigate ? onNavigate(t) : (window.location.href = t); }}>{user ? "dashboard" : "dkit login"}</button>
 <div className="hero-glow">
   <Orb hue={151} hoverIntensity={0.5} rotateOnHover={true}

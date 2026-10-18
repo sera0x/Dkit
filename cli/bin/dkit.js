@@ -52,8 +52,8 @@ const getUserToken = ensureSession
 function maskKey(key) { if (!key) return 'dk_…'; if (key.length < 10) return key + '…'; return key.slice(0, 6) + '…' + key.slice(-4) }
 function findLinkState(dir) { let cur = dir || process.cwd(); while (true) { const p = path.join(cur, '.dkit', 'state.json'); if (fs.existsSync(p)) { try { return JSON.parse(fs.readFileSync(p, 'utf8')) } catch { return null } } const parent = path.dirname(cur); if (parent === cur) return null; cur = parent } }
 function getProjectApiKey() { const config = loadConfig(); const state = findLinkState(); if (state && state.project) { const key = config.apiKeys && config.apiKeys[state.project]; if (key) return key; console.log(chalk.yellow('This folder is linked to "' + state.project + '" but no API key for it is cached on this machine. Run: dkit projects:list')); process.exit(1) } if (!config.currentProject || !config.apiKeys) { console.log(chalk.red('No project selected. Run: dkit projects:list')); process.exit(1) } return config.apiKeys[config.currentProject] }
-program.name('dkit').description('D-Kit CLI - Developer Toolkit').version('0.1.0')
-program.command('login').description('Login to D-Kit').action(async () => {
+program.name('dkit').description('Dkit CLI - Developer Toolkit').version('0.1.0')
+program.command('login').description('Login to Dkit').action(async () => {
 const { email, password } = await inquirer.prompt([{ type: 'input', name: 'email', message: 'Email:' }, { type: 'password', name: 'password', message: 'Password:' }])
 const spinner = ora('Initiating login...').start()
 try {
@@ -98,7 +98,7 @@ twofa.command('setup').description('Start 2FA setup; prints the secret for your 
   const spinner = ora('Generating secret...').start()
   try {
     const r = await getAuthClient(token).post('/api/auth/2fa/setup')
-    spinner.succeed('Add this secret to your authenticator app (D-Kit:<your email>):')
+    spinner.succeed('Add this secret to your authenticator app (Dkit:<your email>):')
     console.log(chalk.bold(r.data.secret))
     console.log(chalk.gray(r.data.otpauth_url))
     console.log('Then run: dkit 2fa enable <code>')
@@ -444,7 +444,7 @@ const token = await getUserToken()
 try { const response = await getAuthClient(token).get('/api/auth/verification-status'); if (response.data.verified) { console.log(chalk.green('Email is verified')) } else { console.log(chalk.yellow('Email not verified. Run: dkit verify:send')) } } catch (error) { console.log(chalk.red(error.response?.data?.error || error.message)) }
 })
 program.command('config').description('Show current configuration').option('-s, --show', 'Reveal full API key').action((options) => {
-const config = loadConfig(); console.log(chalk.cyan('\nD-Kit Configuration\n')); console.log('  User: ' + chalk.yellow(config.user?.email || 'Not logged in')); console.log('  Current Project: ' + chalk.yellow(config.currentProject || 'None')); const key = config.apiKeys?.[config.currentProject]; console.log('  API Key: ' + chalk.dim(key ? (options.show ? key : maskKey(key)) : 'None')); console.log()
+const config = loadConfig(); console.log(chalk.cyan('\nDkit Configuration\n')); console.log('  User: ' + chalk.yellow(config.user?.email || 'Not logged in')); console.log('  Current Project: ' + chalk.yellow(config.currentProject || 'None')); const key = config.apiKeys?.[config.currentProject]; console.log('  API Key: ' + chalk.dim(key ? (options.show ? key : maskKey(key)) : 'None')); console.log()
 })
 program.command('doctor').description('Check connectivity, auth, project link, key health — and scan this folder for problems').option('-f, --fix', 'Apply the safe fixes automatically (git init, ignore .env, resend verification code)').action(async (options) => {
 const config = loadConfig()
@@ -460,7 +460,7 @@ const started = Date.now()
 const health = await axios.get(API_BASE + '/api/health', { timeout: 8000 })
 ok('API', (health.data?.version ? 'v' + health.data.version : 'reachable') + ' — ' + API_BASE + ' (' + (Date.now() - started) + 'ms)')
 } catch (error) {
-fail('API', 'unreachable at ' + API_BASE + ' — ' + (error.response?.data?.error || error.message), 'Check that the D-Kit API is running and that DKIT_API_URL points at it.')
+fail('API', 'unreachable at ' + API_BASE + ' — ' + (error.response?.data?.error || error.message), 'Check that the Dkit API is running and that DKIT_API_URL points at it.')
 }
 
 // 2. Auth + session health (a failed refresh means the user must re-login)
@@ -615,7 +615,7 @@ fail('Syntax', bad.length + ' file' + (bad.length === 1 ? '' : 's') + ' fail to 
 }
 
 const mark = { ok: chalk.green('✓'), warn: chalk.yellow('!'), fail: chalk.red('✗') }
-console.log(chalk.cyan('\nD-Kit doctor\n'))
+console.log(chalk.cyan('\nDkit doctor\n'))
 rows.forEach(([kind, label, detail]) => console.log('  ' + mark[kind] + ' ' + label.padEnd(15) + ' ' + detail))
 if (fixes.length > 0) {
 console.log(chalk.cyan('\nFix these:'))
@@ -626,12 +626,12 @@ if (rows.some(([kind]) => kind === 'fail')) process.exitCode = 1
 })
 program
 .command('new <name>')
-.description('Scaffold a new project and link it to a D-Kit project')
+.description('Scaffold a new project and link it to a Dkit project')
 .option('-t, --template <template>', 'Template name', 'express-pg')
 .option('--dir <path>', 'Target folder (defaults to ./<name>)')
 .option('--package <name>', 'Override the package.json name')
-.option('--project <slug>', 'Use a different D-Kit project name than the folder name')
-.option('--link <existing>', 'Attach to an existing D-Kit project instead of creating one')
+.option('--project <slug>', 'Use a different Dkit project name than the folder name')
+.option('--link <existing>', 'Attach to an existing Dkit project instead of creating one')
 .option('--force', 'Render into a non-empty existing folder')
 .action(async (name, options) => {
   const token = await getUserToken()
@@ -660,7 +660,7 @@ program
       } else {
         const created = await auth.post('/api/projects', { name: projectName })
         project = created.data
-        console.log(chalk.green('Created D-Kit project "' + projectName + '"'))
+        console.log(chalk.green('Created Dkit project "' + projectName + '"'))
       }
     }
   } catch (error) {

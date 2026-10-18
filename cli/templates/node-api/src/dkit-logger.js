@@ -1,4 +1,4 @@
-// Ships logs to D-Kit's log drain. Enabled when DKIT_API_KEY is in the
+// Ships logs to Dkit's log drain. Enabled when DKIT_API_KEY is in the
 // environment (dkit run injects it if you've stored it: dkit env:set DKIT_API_KEY dk_...).
 const API_URL = process.env.DKIT_API_URL || 'http://localhost:3001'
 const API_KEY = process.env.DKIT_API_KEY || ''

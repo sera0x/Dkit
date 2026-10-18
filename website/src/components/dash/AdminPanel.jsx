@@ -180,7 +180,7 @@ export default function AdminPanel() {
             />
             <textarea
               rows={8}
-              placeholder={'Hey everyone —\n\nNew in D-Kit this week: …'}
+              placeholder={'Hey everyone —\n\nNew in Dkit this week: …'}
               value={mailBody}
               maxLength={10000}
               onChange={(e) => setMailBody(e.target.value)}

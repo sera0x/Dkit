@@ -27,7 +27,7 @@ async function main() {
     ['uptime-down', () => mail.sendUptimeAlertEmail(to, { name: 'API', url: 'https://api.dkit.name.ng/health', status: 'down', statusCode: 503, error: 'connect ETIMEDOUT 76.76.21.21:443' })],
     ['uptime-up', () => mail.sendUptimeAlertEmail(to, { name: 'API', url: 'https://api.dkit.name.ng/health', status: 'up', statusCode: 200 })],
     ['welcome', () => mail.sendWelcomeEmail(to)],
-    ['broadcast', () => mail.sendAdminBroadcastEmail(to, { subject: 'Preview: product update', body: 'Hey —\n\nThis is what a broadcast from Admin → mail looks like in your inbox.\n\nBlank lines become paragraphs, exactly like the composer.\n\n— The D-Kit team' })],
+    ['broadcast', () => mail.sendAdminBroadcastEmail(to, { subject: 'Preview: product update', body: 'Hey —\n\nThis is what a broadcast from Admin → mail looks like in your inbox.\n\nBlank lines become paragraphs, exactly like the composer.\n\n— The Dkit team' })],
   ]
 
   let failed = 0

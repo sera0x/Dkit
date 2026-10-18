@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "name": "scheduled-job",
-  "description": "A headless worker run on a D-Kit cron schedule — no server needed",
+  "description": "A headless worker run on a Dkit cron schedule — no server needed",
   "features": ["secrets", "cron"],
   "envHints": [],
   "postScaffold": "npm install"

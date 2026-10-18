@@ -246,7 +246,7 @@ export default function CronPanel({ token, project }) {
         </div>
         <div className="field">
           <label htmlFor="cron-url">URL</label>
-          <p className="field-hint">The endpoint D-Kit calls each time the job runs.</p>
+          <p className="field-hint">The endpoint Dkit calls each time the job runs.</p>
           <input id="cron-url" type="text" inputMode="url" autoCapitalize="none" placeholder="https://your-app.com/api/rollup" value={url} onChange={(e) => setUrl(e.target.value)} />
         </div>
         <div className="field">

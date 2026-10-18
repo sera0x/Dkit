@@ -1,6 +1,6 @@
 # {{Name}}
 
-Scaffolded with `dkit new`. Secrets come from D-Kit at runtime —
+Scaffolded with `dkit new`. Secrets come from Dkit at runtime —
 `npm run dev` runs through `dkit run`, so no `.env` file ever touches disk.
 
 Set what the app needs once:
@@ -12,7 +12,7 @@ Then:
     npm install
     npm run dev
 
-Every request line ships to D-Kit's log drain (`dkit logs:tail` to watch,
+Every request line ships to Dkit's log drain (`dkit logs:tail` to watch,
 `dkit logs:ship` to add your own). No server-side key is stored in the app —
 it reads `DKIT_API_KEY` from the environment.
 

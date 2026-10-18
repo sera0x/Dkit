@@ -55,7 +55,7 @@ const samples = [
   { fn: () => sendUptimeAlertEmail('you@example.com', { name: 'API', url: 'https://api.dkit.name.ng/health', status: 'down', statusCode: 503, error: 'connect ETIMEDOUT 76.76.21.21:443' }), base: 'uptime-down' },
   { fn: () => sendUptimeAlertEmail('you@example.com', { name: 'API', url: 'https://api.dkit.name.ng/health', status: 'up', statusCode: 200 }), base: 'uptime-up' },
   { fn: () => sendWelcomeEmail('you@example.com'), base: 'welcome' },
-  { fn: () => sendAdminBroadcastEmail('you@example.com', { subject: 'Preview: product update', body: 'Hey —\n\nThis is what a broadcast from Admin → mail looks like.\n\n— The D-Kit team' }), base: 'broadcast' },
+  { fn: () => sendAdminBroadcastEmail('you@example.com', { subject: 'Preview: product update', body: 'Hey —\n\nThis is what a broadcast from Admin → mail looks like.\n\n— The Dkit team' }), base: 'broadcast' },
 ]
 
 ;(async () => {

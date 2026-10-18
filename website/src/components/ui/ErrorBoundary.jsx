@@ -14,7 +14,7 @@ class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    console.error('D-Kit website crashed:', error, info);
+    console.error('Dkit website crashed:', error, info);
   }
 
   render() {

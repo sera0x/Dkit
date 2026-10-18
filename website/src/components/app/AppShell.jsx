@@ -145,7 +145,7 @@ export default function AppShell({ active, onNavigate, primaryNav, children }) {
     <aside className="dash-side">
       <button className="dash-side-header" onClick={goHome} title="Back to home">
         <img src={logo} alt="" className="dash-side-logo" />
-        <span>D-Kit</span>
+        <span>Dkit</span>
       </button>
       {nav}
       {accountSlot}
@@ -154,7 +154,7 @@ export default function AppShell({ active, onNavigate, primaryNav, children }) {
 
   const topbar = (
     <div className="dash-topbar">
-      <button className="dash-topbar-brand" onClick={goHome}><img src={logo} alt="" />D-Kit</button>
+      <button className="dash-topbar-brand" onClick={goHome}><img src={logo} alt="" />Dkit</button>
       <div className="dash-topbar-actions">
         <button className="icon-btn" onClick={toggleTheme} aria-label="Toggle color theme">
           {theme === 'dark' ? <Sun width="16" height="16" /> : <Moon width="16" height="16" />}
@@ -170,7 +170,7 @@ export default function AppShell({ active, onNavigate, primaryNav, children }) {
       <div className={'dash-backdrop' + (drawerClosing ? ' is-closing' : '')} onClick={closeDrawer} aria-hidden="true" />
       <div key={drawerKey} className={'dash-drawer' + (drawerClosing ? ' is-closing' : '')} role="dialog" aria-label="Menu">
         <div className="dash-drawer-header">
-          <button className="dash-side-header" onClick={goHome}><img src={logo} alt="" className="dash-side-logo" /><span>D-Kit</span></button>
+          <button className="dash-side-header" onClick={goHome}><img src={logo} alt="" className="dash-side-logo" /><span>Dkit</span></button>
           <button className="dash-drawer-close" aria-label="Close menu" onClick={closeDrawer}><X width="16" height="16" /></button>
         </div>
         {nav}

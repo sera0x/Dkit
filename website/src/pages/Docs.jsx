@@ -55,7 +55,7 @@ const CLI_COMMANDS = [
   ['dkit monitor:list', 'List monitors and their live status.'],
   ['dkit monitor:pause <name>', 'Pause a monitor (--resume).'],
   ['dkit monitor:rm <name>', 'Delete a monitor.'],
-  ['dkit.name.ng/status', 'Live status of D-Kit\u2019s own services: API, Website, Docs. Auto-updates every 30s; incidents post here automatically.'],
+  ['dkit.name.ng/status', 'Live status of Dkit\u2019s own services: API, Website, Docs. Auto-updates every 30s; incidents post here automatically.'],
   ['dkit logs:ship [msg]', 'Ship a log line (or piped JSON lines) to the drain. -l level, -s source, -m meta JSON.'],
   ['dkit logs:tail', 'Recent logs for the linked project. -l level, -q search, -n lines.'],
   ['dkit logs:clear', 'Delete all logs for the linked project.'],
@@ -102,7 +102,7 @@ export default function Docs({ onNavigate }) {
           </ol>
           <CodeBlock>{`npm i -g dkit-cli
 # or, same CLI from the GitHub release (checksum verified):
-curl -fsSL https://raw.githubusercontent.com/sera0x/D-Kit/main/install.sh | sh`}</CodeBlock>
+curl -fsSL https://raw.githubusercontent.com/sera0x/Dkit/main/install.sh | sh`}</CodeBlock>
           <ol start={5}>
             <li>Log in and start setting secrets:</li>
           </ol>

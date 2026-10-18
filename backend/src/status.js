@@ -1,6 +1,6 @@
 // Public status page (dkit.name.ng/status) engine.
 //
-// D-Kit watches its own services with the same idea as user monitors
+// Dkit watches its own services with the same idea as user monitors
 // (jobs.js), plus the pieces a status page needs on top:
 //
 //   - Seeded service list: API, Website, Docs (probed over HTTP).
@@ -138,7 +138,7 @@ async function sendStatusFlipEmail(serviceName, url, status, errorText) {
   try {
     const to = await adminEmail()
     if (!to) return
-    await sendUptimeAlertEmail(to, { name: 'D-Kit · ' + serviceName, url, status, error: errorText })
+    await sendUptimeAlertEmail(to, { name: 'Dkit · ' + serviceName, url, status, error: errorText })
   } catch { /* never let a mail failure touch the probe loop */ }
 }
 

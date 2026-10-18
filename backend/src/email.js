@@ -6,7 +6,7 @@ if (!process.env.RESEND_API_KEY) {
 }
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-const FROM = 'D-Kit <noreply@dkit.name.ng>'
+const FROM = 'Dkit <noreply@dkit.name.ng>'
 const APP_URL = process.env.PUBLIC_URL || 'https://dkit.name.ng'
 const YEAR = new Date().getFullYear()
 
@@ -57,7 +57,7 @@ function htmlShell({ title, introHtml, mainHtml, footnoteHtml }) {
 <tr><td bgcolor="${WHITE}" align="center" style="padding: 40px 16px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 480px;">
   <tr><td align="center" style="padding-bottom: 24px;">
-    <span style="font-family: ${FONT}; font-size: 19px; font-weight: 700; letter-spacing: -0.02em; color: ${INK};">D-Kit</span>
+    <span style="font-family: ${FONT}; font-size: 19px; font-weight: 700; letter-spacing: -0.02em; color: ${INK};">Dkit</span>
   </td></tr>
   <tr><td style="background: ${WHITE}; border: 1px solid ${LINE}; border-radius: 16px; padding: 28px 26px;">
     <h1 style="margin: 0 0 12px; font-family: ${FONT}; font-size: 21px; line-height: 1.3; font-weight: 700; letter-spacing: -0.01em; color: ${INK};">${escapeHtml(title)}</h1>
@@ -66,7 +66,7 @@ function htmlShell({ title, introHtml, mainHtml, footnoteHtml }) {
   </td></tr>
   <tr><td style="padding: 24px 4px 8px; border-top: 1px solid ${LINE};">
     <p style="margin: 0; font-family: ${FONT}; font-size: 12px; line-height: 1.6; color: ${MUTED}; text-align: center;">
-      ${footnoteHtml}<br />&copy; ${YEAR} D-Kit &middot; <a href="${APP_URL}" style="color: ${MUTED}; text-decoration: underline;">${APP_URL.replace(/^https?:\/\//, '')}</a>
+      ${footnoteHtml}<br />&copy; ${YEAR} Dkit &middot; <a href="${APP_URL}" style="color: ${MUTED}; text-decoration: underline;">${APP_URL.replace(/^https?:\/\//, '')}</a>
     </p>
   </td></tr>
 </table>
@@ -125,7 +125,7 @@ function sendVerificationCode(email, code) {
     title: 'Verify your email',
     introHtml: p('Enter this code to finish creating your account.'),
     mainHtml: codeBlock(code) + dim('This code expires in 10 minutes.'),
-    footnoteHtml: `If you didn't sign up for D-Kit, ignore this email.`,
+    footnoteHtml: `If you didn't sign up for Dkit, ignore this email.`,
   })
   const text = [
     'Verify your email',
@@ -136,10 +136,10 @@ function sendVerificationCode(email, code) {
     '',
     'This code expires in 10 minutes.',
     '',
-    `If you didn't sign up for D-Kit, ignore this email.`,
+    `If you didn't sign up for Dkit, ignore this email.`,
     APP_URL,
   ].join('\n')
-  return deliver(email, 'Your D-Kit verification code', html, text)
+  return deliver(email, 'Your Dkit verification code', html, text)
 }
 
 function sendLoginCode(email, code) {
@@ -161,7 +161,7 @@ function sendLoginCode(email, code) {
     `If you weren't signing in, ignore this email and your account stays as it was.`,
     APP_URL,
   ].join('\n')
-  return deliver(email, 'Your D-Kit login code', html, text)
+  return deliver(email, 'Your Dkit login code', html, text)
 }
 
 function sendPasswordResetEmail(email, resetUrl) {
@@ -186,7 +186,7 @@ function sendPasswordResetEmail(email, resetUrl) {
     `If you didn't request a reset, ignore this email and your password stays unchanged.`,
     APP_URL,
   ].join('\n')
-  return deliver(email, 'Reset your D-Kit password', html, text)
+  return deliver(email, 'Reset your Dkit password', html, text)
 }
 
 function sendTeamInviteEmail(email, inviteUrl, { teamName = 'a team', inviterEmail = '', role = 'member' } = {}) {
@@ -194,7 +194,7 @@ function sendTeamInviteEmail(email, inviteUrl, { teamName = 'a team', inviterEma
     title: `You've been invited to ${escapeHtml(teamName)}`,
     introHtml: p(
       (inviterEmail ? strong(escapeHtml(inviterEmail)) + ' invited you' : `You've been invited`) +
-      ` to join ${strong(escapeHtml(teamName))} on D-Kit as ${strong(escapeHtml(role))}.`
+      ` to join ${strong(escapeHtml(teamName))} on Dkit as ${strong(escapeHtml(role))}.`
     ),
     mainHtml:
       linkButton(inviteUrl, 'Accept invitation') +
@@ -205,7 +205,7 @@ function sendTeamInviteEmail(email, inviteUrl, { teamName = 'a team', inviterEma
   const text = [
     `You've been invited to ${teamName}`,
     '',
-    (inviterEmail ? inviterEmail + ' invited you' : `You've been invited`) + ` to join ${teamName} on D-Kit as ${role}.`,
+    (inviterEmail ? inviterEmail + ' invited you' : `You've been invited`) + ` to join ${teamName} on Dkit as ${role}.`,
     '',
     'Accept here:',
     inviteUrl,
@@ -216,7 +216,7 @@ function sendTeamInviteEmail(email, inviteUrl, { teamName = 'a team', inviterEma
     `Not expecting this? Ignore the email and you won't be added to anything.`,
     APP_URL,
   ].join('\n')
-  return deliver(email, `You've been invited to join ${teamName} on D-Kit`, html, text)
+  return deliver(email, `You've been invited to join ${teamName} on Dkit`, html, text)
 }
 
 // Uptime alert: sent when a monitor flips down (and again when it recovers).
@@ -241,7 +241,7 @@ function sendUptimeAlertEmail(email, { name, url, status, statusCode, error }) {
         detailRow(down ? 'Error' : 'Status', escapeHtml(reason), down ? RED : undefined)
       ) +
       (down ? dim('You will get one email when it comes back up — not one per failed check.') : dim('No action needed.')),
-    footnoteHtml: 'Sent by a D-Kit uptime monitor.',
+    footnoteHtml: 'Sent by a Dkit uptime monitor.',
   })
   const text = [
     title,
@@ -255,28 +255,28 @@ function sendUptimeAlertEmail(email, { name, url, status, statusCode, error }) {
     down ? 'You will get one email when it comes back up.' : 'No action needed.',
     APP_URL,
   ].join('\n')
-  return deliver(email, (down ? '[DOWN] ' : '[UP] ') + name + ' — D-Kit monitor', html, text)
+  return deliver(email, (down ? '[DOWN] ' : '[UP] ') + name + ' — Dkit monitor', html, text)
 }
 
 // Welcome mail — sent once right after signup (before verification, so it
 // doubles as confirmation that the address works).
 function sendWelcomeEmail(email) {
   const html = htmlShell({
-    title: 'Welcome to D-Kit',
+    title: 'Welcome to Dkit',
     introHtml: p('Your account is ready.'),
     mainHtml:
       linkButton(APP_URL + '/signup', 'Create your first project'),
-    footnoteHtml: 'You are receiving this because someone signed up to D-Kit with this address.',
+    footnoteHtml: 'You are receiving this because someone signed up to Dkit with this address.',
   })
   const text = [
-    'Welcome to D-Kit',
+    'Welcome to Dkit',
     '',
     'Your account is ready. Create your first project:',
     APP_URL + '/signup',
     '',
     APP_URL,
   ].join('\n')
-  return deliver(email, 'Welcome to D-Kit', html, text)
+  return deliver(email, 'Welcome to Dkit', html, text)
 }
 
 // Admin broadcast — drafted in the admin dashboard, sent to users.
@@ -289,7 +289,7 @@ function sendAdminBroadcastEmail(email, { subject, body }) {
     title: subject,
     introHtml: paragraphs,
     mainHtml: '',
-    footnoteHtml: 'Sent by the D-Kit team.',
+    footnoteHtml: 'Sent by the Dkit team.',
   })
   const text = [subject, '', String(body || '').trim(), '', APP_URL].join('\n')
   return deliver(email, subject, html, text)

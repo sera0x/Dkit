@@ -16,7 +16,7 @@ const DashboardShot = () => (
     </div>
     <div className="dshot-body">
       <aside className="dshot-side">
-        <div className="dshot-brand"><img src={logo} alt="" className="dshot-logo" /><span>D-Kit</span></div>
+        <div className="dshot-brand"><img src={logo} alt="" className="dshot-logo" /><span>Dkit</span></div>
         <span className="dshot-nav on">Projects</span>
         <span className="dshot-nav">Secrets</span>
         <span className="dshot-nav">Cron</span>

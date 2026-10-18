@@ -16,7 +16,7 @@ $ dkit new api
 ✔ Scaffolded api and linked it to project "api"
 ```
 
-D-Kit is for the parts of a side project nobody wants to build twice: where secrets live, what runs on a schedule, whether the site is up, where the logs went. One backend serves a CLI, a dashboard and a plain HTTP API, so you can script it, click it, or both.
+Dkit is for the parts of a side project nobody wants to build twice: where secrets live, what runs on a schedule, whether the site is up, where the logs went. One backend serves a CLI, a dashboard and a plain HTTP API, so you can script it, click it, or both.
 
 ```text
    dkit CLI                dashboard
@@ -74,7 +74,7 @@ Teams get owner, admin and member roles, projects shared into a team, and invita
 
 ```bash
 git clone https://github.com/sera0x/Dkit.git
-cd D-Kit
+cd Dkit
 cp backend/.env.example backend/.env     # fill in the three values below
 ./scripts/start.sh
 ```

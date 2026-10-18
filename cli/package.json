@@ -1,7 +1,7 @@
 {
   "name": "dkit-cli",
   "version": "0.1.0",
-  "description": "D-Kit CLI - secrets, scaffolding, cron jobs, uptime monitors, and log shipping from one command",
+  "description": "Dkit CLI - secrets, scaffolding, cron jobs, uptime monitors, and log shipping from one command",
   "license": "MIT",
   "bin": {
     "dkit": "./bin/dkit.js"
@@ -17,10 +17,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sera0x/D-Kit.git"
+    "url": "git+https://github.com/sera0x/Dkit.git"
   },
-  "homepage": "https://github.com/sera0x/D-Kit#readme",
-  "bugs": "https://github.com/sera0x/D-Kit/issues",
+  "homepage": "https://github.com/sera0x/Dkit#readme",
+  "bugs": "https://github.com/sera0x/Dkit/issues",
   "keywords": [
     "dkit",
     "cli",

@@ -32,7 +32,7 @@ const TerminalDemo = () => {
             "npm run dev",
           ]}
           outputs={{
-            0: ["✓ Created D-Kit project \"payments-api\"", "✓ Scaffolded 14 files from express-pg"],
+            0: ["✓ Created Dkit project \"payments-api\"", "✓ Scaffolded 14 files from express-pg"],
             1: ["added 62 packages in 3s"],
             2: ["✓ DATABASE_URL set for production"],
             3: ["Server running on :3000", "(no .env file was created)"],

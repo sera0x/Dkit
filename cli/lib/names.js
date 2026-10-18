@@ -1,4 +1,4 @@
-// Naming derivation + validation for the D-Kit scaffolder.
+// Naming derivation + validation for the Dkit scaffolder.
 function kebab(s) {
   return String(s).trim().toLowerCase()
     .replace(/[_\s]+/g, '-')

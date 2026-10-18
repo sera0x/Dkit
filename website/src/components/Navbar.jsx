@@ -12,8 +12,8 @@ export default function Navbar({ user, theme, toggleTheme, onNavigate }) {
     <nav className="site-nav">
       <div className="nav-container">
         <a href="/" className="nav-brand" onClick={(e) => goto('/', e)}>
-          <img src={logo} alt="D-Kit" className="nav-logo" />
-          <span>D-Kit</span>
+          <img src={logo} alt="Dkit" className="nav-logo" />
+          <span>Dkit</span>
         </a>
 
         <div className="nav-links">

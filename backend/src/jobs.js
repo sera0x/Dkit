@@ -1,4 +1,4 @@
-// Background worker for D-Kit's runtime features. Started by server.js after
+// Background worker for Dkit's runtime features. Started by server.js after
 // the DB is ready. Everything here is best-effort: a failing probe or job run
 // is recorded, never thrown — the API keeps serving while this loops.
 //

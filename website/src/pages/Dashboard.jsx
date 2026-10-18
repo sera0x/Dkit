@@ -115,7 +115,7 @@ function SecuritySection({ token }) {
         {!status.enabled && setup && (
           <div style={{ display: 'grid', gap: '0.8rem', justifyItems: 'start' }}>
             <p className="field-hint" style={{ margin: 0 }}>Scan with your authenticator app, or paste the key:</p>
-            <img src={setup.qr} alt="QR code with the D-Kit two-factor secret" width="180" height="180"
+            <img src={setup.qr} alt="QR code with the Dkit two-factor secret" width="180" height="180"
               style={{ borderRadius: 8, background: '#fff', padding: 6 }} />
             <code style={{ fontSize: '0.8rem' }}>{setup.secret}</code>
             <form onSubmit={confirmEnable} style={{ display: 'grid', gap: '0.6rem', justifyItems: 'start' }}>
@@ -603,8 +603,8 @@ export default function Dashboard({ onNavigate }) {
           <div className="paste-key-row">
             <p className="paste-key-hint">
               {p.is_shared
-                ? 'Keys are stored hashed, so D-Kit can never show one, not even to the owner. Paste the key shared with you once; it stays in this browser only.'
-                : 'Keys are stored hashed, so D-Kit can never show one, not even yours. Paste the key from when you created it, or rotate to get a new one.'}
+                ? 'Keys are stored hashed, so Dkit can never show one, not even to the owner. Paste the key shared with you once; it stays in this browser only.'
+                : 'Keys are stored hashed, so Dkit can never show one, not even yours. Paste the key from when you created it, or rotate to get a new one.'}
             </p>
             <input
               type="text"

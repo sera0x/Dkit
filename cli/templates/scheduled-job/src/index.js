@@ -1,4 +1,4 @@
-// {{Name}} — a scheduled job. Pair this with a D-Kit cron entry and it runs
+// {{Name}} — a scheduled job. Pair this with a Dkit cron entry and it runs
 // on a timer without a server that stays awake:
 //
 //   dkit cron:add run-{{name}} https://your-runner.example/hook -s "daily 03:00"

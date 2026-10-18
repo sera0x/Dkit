@@ -12,12 +12,12 @@ const Features = () => {
             <h3>One command to start</h3>
             <p>
               <code>dkit new</code> scaffolds a real backend and links it to
-              a live D-Kit project in one step. No .env file is created.
+              a live Dkit project in one step. No .env file is created.
             </p>
           </div>
           <div className="feature-snippet">
             <div><span className="cmd">$ dkit new</span> payments-api --template express-pg</div>
-            <div className="out">✓ Created D-Kit project "payments-api"</div>
+            <div className="out">✓ Created Dkit project "payments-api"</div>
             <div className="out">✓ Scaffolded 14 files from express-pg</div>
             <div style={{ marginTop: '0.75rem' }}><span className="cmd">$</span> cd payments-api && npm run dev</div>
           </div>

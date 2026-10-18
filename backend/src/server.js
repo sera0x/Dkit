@@ -14,7 +14,7 @@ const crypto = require('crypto')
 const app = express()
 // ---------------------------------------------------------------------------
 // Self-hosting bootstrap: any env var NOT set in the environment is read from
-// the special 'dkit-self' project (a normal D-Kit project). dkit.name.ng runs
+// the special 'dkit-self' project (a normal Dkit project). dkit.name.ng runs
 // its own config through its own product.
 // Environment still wins, so ops can always override without touching the DB.
 // Never load private keys here: those go in backend/.env only.
@@ -102,13 +102,13 @@ if (!/[a-z]/.test(password)) errors.push('Password must contain at least one low
 if (!/[0-9]/.test(password)) errors.push('Password must contain at least one number')
 return errors
 }
-app.get('/api/health', (req, res) => { res.json({ status: 'ok', service: 'D-Kit API', version: '0.1.0' }) })
+app.get('/api/health', (req, res) => { res.json({ status: 'ok', service: 'Dkit API', version: '0.1.0' }) })
 // Friendly alias: /health would otherwise fall through to the SPA; point it at the real endpoint.
 app.get('/health', (req, res) => { res.redirect(302, '/api/health') })
 
 // ---------------------------------------------------------------------------
 // Public status page (GET /api/status — the website /status page reads this).
-// No auth: anyone can see which D-Kit services are up. The prober lives in
+// No auth: anyone can see which Dkit services are up. The prober lives in
 // status.js; admins control per-service up/down and incidents via /api/admin/*.
 // ---------------------------------------------------------------------------
 app.get('/api/status', async (req, res) => {
@@ -170,7 +170,7 @@ await pool.query('UPDATE users SET last_ip = $1, last_login_at = NOW() WHERE id 
 // Welcome mail goes out once, right after signup. Fire-and-forget: the
 // response must not wait on (or fail because of) the second email.
 sendWelcomeEmail(email).catch(() => {})
-res.json({ user: result.rows[0], token, refresh_token, message: 'Welcome to D-Kit. Verification code sent to your email.' })
+res.json({ user: result.rows[0], token, refresh_token, message: 'Welcome to Dkit. Verification code sent to your email.' })
 } catch (err) {
 if (err.code === '23505') return res.status(400).json({ error: 'Email already exists' })
 res.status(500).json({ error: 'Something went wrong' })
@@ -1489,7 +1489,7 @@ app.use((req, res, next) => { if (req.path.startsWith('/api/')) return next(); r
   await status.ensureSeed()    // status page: API/Website/Docs services
   status.startStatusProbes()   // status page prober + uptime rollups
   app.listen(PORT, () => {
-    console.log('D-Kit API running on port ' + PORT)
+    console.log('Dkit API running on port ' + PORT)
     console.log('http://localhost:' + PORT + '/api/health')
   })
 })().catch((err) => {

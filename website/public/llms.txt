@@ -1,4 +1,4 @@
-# D-Kit
+# Dkit
 
 Self-hosted secrets manager for side projects: env vars per environment,
 injected into processes at runtime (no .env on disk), human-readable cron that
@@ -10,13 +10,13 @@ Site: https://dkit.name.ng
 Docs: https://dkit.name.ng/docs
 Status: https://dkit.name.ng/status
 Changelog: https://dkit.name.ng/changelog
-Source: https://github.com/sera0x/D-Kit
+Source: https://github.com/sera0x/Dkit
 License: MIT
 
 Install the CLI:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/sera0x/D-Kit/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/sera0x/Dkit/main/install.sh | sh
 ```
 
 or `npm install -g dkit-cli`.

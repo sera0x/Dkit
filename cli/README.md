@@ -1,6 +1,6 @@
 # dkit-cli
 
-Command-line interface for [D-Kit](https://github.com/sera0x/D-Kit). Secrets,
+Command-line interface for [Dkit](https://github.com/sera0x/Dkit). Secrets,
 scaffolding, cron jobs, uptime monitors, and log shipping from one
 `dkit` command.
 
@@ -17,13 +17,13 @@ Prefer not to use npm? The same CLI ships as a tarball with every GitHub
 release, with an installer that verifies the checksum first:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sera0x/D-Kit/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/sera0x/Dkit/main/install.sh | sh
 ```
 
 ## Quickstart
 
 ```bash
-dkit signup        # create an account on your D-Kit server
+dkit signup        # create an account on your Dkit server
 dkit login
 dkit new my-app    # scaffold a project (express-pg, node-api, scheduled-job, static-site)
 dkit env:set DATABASE_URL postgres://...

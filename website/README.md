@@ -1,4 +1,4 @@
-# D-Kit website
+# Dkit website
 
 React + Vite marketing site and dashboard. The production build is served
 directly by the backend, so there's no separate web server to run.

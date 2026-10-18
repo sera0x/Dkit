@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "name": "static-site",
-  "description": "Static site + tiny deploy script that logs each deploy to D-Kit",
+  "description": "Static site + tiny deploy script that logs each deploy to Dkit",
   "features": ["logs"],
   "envHints": ["DKIT_API_KEY"],
   "postScaffold": "npm install"

@@ -70,7 +70,7 @@ const Navbar = ({ onNavigate, currentPath }) => {
       <div className="navbar-inner">
         <button className="navbar-brand" onClick={() => go('/')}>
           <img src={logo} alt="" className="navbar-logo" />
-          <span>D-Kit</span>
+          <span>Dkit</span>
         </button>
         <div className="navbar-actions">
           {!onAuthPage && (user ? (
@@ -97,7 +97,7 @@ const Navbar = ({ onNavigate, currentPath }) => {
               <div className="navbar-drawer-header">
                 <button className="navbar-brand" onClick={() => go('/')}>
                   <img src={logo} alt="" className="navbar-logo" />
-                  <span>D-Kit</span>
+                  <span>Dkit</span>
                 </button>
                 <button className="navbar-drawer-close" aria-label="Close menu" onClick={closeDrawer}>
                   <X width="16" height="16" />

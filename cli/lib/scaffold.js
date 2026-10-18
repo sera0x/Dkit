@@ -1,4 +1,4 @@
-// Placeholder engine + atomic renderer for the D-Kit scaffolder.
+// Placeholder engine + atomic renderer for the Dkit scaffolder.
 // Templates are text-only by convention; binary assets are not supported.
 const fs = require('fs')
 const path = require('path')

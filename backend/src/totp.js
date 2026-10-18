@@ -68,8 +68,8 @@ function verifyTotp(secret, token, window = 1) {
 }
 
 function otpauthUrl(email, secret) {
-  const label = encodeURIComponent('D-Kit:' + email)
-  return 'otpauth://totp/' + label + '?secret=' + secret + '&issuer=D-Kit&algorithm=SHA1&digits=6&period=30'
+  const label = encodeURIComponent('Dkit:' + email)
+  return 'otpauth://totp/' + label + '?secret=' + secret + '&issuer=Dkit&algorithm=SHA1&digits=6&period=30'
 }
 
 module.exports = { generateSecret, verifyTotp, totpAt, otpauthUrl, base32Decode }

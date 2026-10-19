@@ -63,7 +63,7 @@ const GREEN_INK_UP = '#14532D'
 const DARK_BTN = '#111827'  // neutral CTA
 const BTN_FG = '#07130e'    // near-black on brand green (7.4:1)
 
-const LOGO = `${APP_URL}/dkit-logo-curved.png`   // rounded lockup with an alpha fade at the bottom
+const LOGO = `${APP_URL}/dkit-email-header.png`   // green chip + white D monogram, hard bottom edge (no fade)
 
 const HELP_URL = `${APP_URL}/help`
 const PREFS_URL = `${APP_URL}/settings/email`
@@ -129,9 +129,9 @@ function htmlShell({ title, preheader, eyebrow, eyebrowColor = GREEN_INK, introH
 <td align="center" style="padding:36px 16px 48px;">
   <table role="presentation" class="container" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;max-width:600px;">
     <tr>
-      <td align="center" style="padding:0 0 22px;">
+      <td align="center" style="padding:0 0 14px;">
         <a href="${APP_URL}" style="text-decoration:none;">
-          <img src="${LOGO}" width="600" alt="Dkit" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:12px;" />
+          <img src="${LOGO}" width="96" height="78" alt="Dkit" style="display:inline-block;width:96px;max-width:96px;height:auto;border:0;border-radius:0;" />
         </a>
       </td>
     </tr>

@@ -102,9 +102,22 @@ if (!/[a-z]/.test(password)) errors.push('Password must contain at least one low
 if (!/[0-9]/.test(password)) errors.push('Password must contain at least one number')
 return errors
 }
-app.get('/api/health', (req, res) => { res.json({ status: 'ok', service: 'Dkit API', version: '0.1.0' }) })
+app.get('/api/health', (req, res) => {
+  const ascii = `
+         d88888
+       d8"  .88
+     .d8"    .88
+    d88888888888
+   d8"      .d888
+  d8"        .d8888
+ d8"          .d88888
+d8              .d888888
+88              d88888888
+8888888888888888888888888
+`
+  res.json({ status: 'ok', service: 'Dkit API', version: '0.1.0', ascii })})
 // Friendly alias: /health would otherwise fall through to the SPA; point it at the real endpoint.
-app.get('/health', (req, res) => { res.redirect(302, '/api/health') })
+app.get('/health', (req, res) => { res.redirect(302, '/api/health?force=true') })
 
 // ---------------------------------------------------------------------------
 // Public status page (GET /api/status — the website /status page reads this).

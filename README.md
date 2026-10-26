@@ -31,7 +31,9 @@ Checksum-verified download, needs only curl, tar and node. If Node is already in
 git clone https://github.com/sera0x/Dkit.git
 cd Dkit
 cp backend/.env.example backend/.env   # fill in the three required values
-./scripts/start.sh
+(cd backend && npm install)
+(cd website && npm install && npm run build)
+(cd backend && node src/server.js)
 ```
 
 That brings up the API and the dashboard on `localhost:3001`. The schema creates itself on first boot. You need Node 18+, PostgreSQL and Redis, plus:

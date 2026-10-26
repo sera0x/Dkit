@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutGrid, KeyRound, Folder, Database, ShieldCheck,
   Eye, EyeOff, Copy, Check, ChevronLeft, Trash2, RotateCcw,
-  Mail, Search, Plus, RefreshCw, Users, Clock, Activity, ScrollText, Download, Info, Smartphone,
+  Mail, Search, Plus, RefreshCw, Users, Clock, Activity, ScrollText, Download, Info, Smartphone, Image, Zap,
 } from 'lucide-react';
 import AppShell from '../components/app/AppShell';
 import QRCode from 'qrcode';
@@ -16,6 +16,8 @@ import '../components/dash/confirm-banner.css';
 import TeamsPanel from '../components/dash/TeamsPanel';
 import CronPanel from '../components/dash/CronPanel';
 import MonitorsPanel from '../components/dash/MonitorsPanel';
+import MediaPanel from '../components/dash/MediaPanel';
+import CachePanel from '../components/dash/CachePanel';
 import LogsPanel from '../components/dash/LogsPanel';
 import { vault } from '../lib/api';
 import { takeDashboardSection } from '../lib/pendingInvite';
@@ -30,6 +32,8 @@ const NAV_ITEMS = [
   { id: 'secrets', label: 'secrets', Icon: KeyRound },
   { id: 'cron', label: 'cron', Icon: Clock },
   { id: 'monitors', label: 'monitors', Icon: Activity },
+  { id: 'media', label: 'media', Icon: Image },
+  { id: 'cache', label: 'cache', Icon: Zap },
   { id: 'projects', label: 'projects', Icon: Folder },
   { id: 'teams', label: 'teams', Icon: Users },
   { id: 'security', label: 'security', Icon: Smartphone },
@@ -1328,6 +1332,76 @@ export default function Dashboard({ onNavigate }) {
                     <span className="env-chip">{selected.name}</span>
                   </div>
                   <MonitorsPanel token={token} project={selected} userEmail={user?.email} />
+                </>
+              )}
+            </>
+          )}
+
+          {section === 'media' && (
+            <>
+              <PageHeader Icon={Image} title="Media" />
+              {!selected ? (
+                projects.length === 0 ? (
+                  <div className="empty-state">
+                    <Image width="22" height="22" />
+                    <p>An image CDN on Cloudflare storage — upload once, get a fast URL. Our box never holds the bytes.</p>
+                    <button className="cta-button ghost" onClick={() => setSection('projects')}>Create a project</button>
+                  </div>
+                ) : (
+                  <>
+                    <p className="page-header-sub" style={{ marginBottom: '1rem' }}>Pick a project to manage its files.</p>
+                    <div className="project-picker">
+                      {projects.map((p) => (
+                        <button key={p.id} className="project-pick" onClick={() => pickProject(p)}>
+                          <span className="project-avatar" aria-hidden="true">{p.name.slice(0, 1).toUpperCase()}</span>
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )
+              ) : (
+                <>
+                  <div className="secrets-toolbar">
+                    <button className="breadcrumb-back" onClick={() => setSelectedId(null)}><ChevronLeft width="14" height="14" /> projects</button>
+                    <span className="env-chip">{selected.name}</span>
+                  </div>
+                  <MediaPanel token={token} project={selected} />
+                </>
+              )}
+            </>
+          )}
+
+          {section === 'cache' && (
+            <>
+              <PageHeader Icon={Zap} title="Cache" />
+              {!selected ? (
+                projects.length === 0 ? (
+                  <div className="empty-state">
+                    <Zap width="22" height="22" />
+                    <p>A Redis-backed cache — fast strings and atomic counters with TTLs. Evictable by design.</p>
+                    <button className="cta-button ghost" onClick={() => setSection('projects')}>Create a project</button>
+                  </div>
+                ) : (
+                  <>
+                    <p className="page-header-sub" style={{ marginBottom: '1rem' }}>Pick a project to manage its cache.</p>
+                    <div className="project-picker">
+                      {projects.map((p) => (
+                        <button key={p.id} className="project-pick" onClick={() => pickProject(p)}>
+                          <span className="project-avatar" aria-hidden="true">{p.name.slice(0, 1).toUpperCase()}</span>
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )
+              ) : (
+                <>
+                  <div className="secrets-toolbar">
+                    <button className="breadcrumb-back" onClick={() => setSelectedId(null)}><ChevronLeft width="14" height="14" /> projects</button>
+                    <span className="env-chip">{selected.name}</span>
+                  </div>
+                  <CachePanel token={token} project={selected} />
                 </>
               )}
             </>

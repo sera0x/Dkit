@@ -52,7 +52,7 @@ const getUserToken = ensureSession
 function maskKey(key) { if (!key) return 'dk_…'; if (key.length < 10) return key + '…'; return key.slice(0, 6) + '…' + key.slice(-4) }
 function findLinkState(dir) { let cur = dir || process.cwd(); while (true) { const p = path.join(cur, '.dkit', 'state.json'); if (fs.existsSync(p)) { try { return JSON.parse(fs.readFileSync(p, 'utf8')) } catch { return null } } const parent = path.dirname(cur); if (parent === cur) return null; cur = parent } }
 function getProjectApiKey() { const config = loadConfig(); const state = findLinkState(); if (state && state.project) { const key = config.apiKeys && config.apiKeys[state.project]; if (key) return key; console.log(chalk.yellow('This folder is linked to "' + state.project + '" but no API key for it is cached on this machine. Run: dkit projects:list')); process.exit(1) } if (!config.currentProject || !config.apiKeys) { console.log(chalk.red('No project selected. Run: dkit projects:list')); process.exit(1) } return config.apiKeys[config.currentProject] }
-program.name('dkit').description('Dkit CLI - Developer Toolkit').version('0.1.0')
+program.name('dkit').description('Dkit CLI - Developer Toolkit').version('0.3.0')
 program.command('login').description('Login to Dkit').action(async () => {
 const { email, password } = await inquirer.prompt([{ type: 'input', name: 'email', message: 'Email:' }, { type: 'password', name: 'password', message: 'Password:' }])
 const spinner = ora('Initiating login...').start()
@@ -265,6 +265,52 @@ const apiKey = getProjectApiKey(); const client = getApiClient(apiKey); const sp
 try { await client.delete('/api/store/' + key); spinner.succeed(key + ' deleted') } catch (error) { spinner.fail('Failed to delete key'); console.log(chalk.red(error.response?.data?.error || error.message)) }
 })
 // ==========================================================================
+// CACHE — Redis-backed KV. This is the fast, TTL-first sibling of `store:*`:
+// values are plain strings, counters are atomic, and entries are EVICTABLE
+// (maxmemory 64mb / allkeys-lru). Never keep the only copy of anything here.
+// ==========================================================================
+function kvClient() { return getApiClient(getProjectApiKey()) }
+function kvError(error) { console.log(chalk.red(error.response?.data?.error || error.message)) }
+program.command('kv:set <key> <value>').description('Set a cache value (string), optionally with a TTL').option('--ttl <seconds>', 'Expire after N seconds (1-2592000)').action(async (key, value, options) => {
+  try {
+    const params = options.ttl ? { ttl: Number(options.ttl) } : {}
+    const response = await kvClient().put('/api/kv/' + encodeURIComponent(key), value, { headers: { 'content-type': 'text/plain' }, params })
+    console.log(chalk.green(key + ' cached') + (response.data.ttl ? chalk.dim(' · expires in ' + response.data.ttl + 's') : chalk.dim(' · no expiry')))
+  } catch (error) { kvError(error) }
+})
+program.command('kv:get <key>').description('Read a cache value (prints the raw string)').action(async (key) => {
+  try { const response = await kvClient().get('/api/kv/' + encodeURIComponent(key)); console.log(response.data.value) } catch (error) { kvError(error) }
+})
+program.command('kv:incr <key> [amount]').description('Atomically increment a counter (negative to decrement)').option('--ttl <seconds>', 'Set a TTL when the counter is first created').action(async (key, amount, options) => {
+  try {
+    const body = { by: amount !== undefined ? Number(amount) : 1 }
+    if (options.ttl) body.ttl = Number(options.ttl)
+    const response = await kvClient().post('/api/kv/' + encodeURIComponent(key) + '/incr', body)
+    console.log(chalk.green(key + ' = ' + response.data.value) + (response.data.ttl ? chalk.dim(' · expires in ' + response.data.ttl + 's') : ''))
+  } catch (error) { kvError(error) }
+})
+program.command('kv:list').description('List cache keys with their remaining TTL').option('--prefix <prefix>', 'Only keys starting with this prefix').option('--limit <n>', 'Max keys to show', '100').action(async (options) => {
+  try {
+    const params = { limit: Number(options.limit) || 100 }
+    if (options.prefix) params.prefix = options.prefix
+    const response = await kvClient().get('/api/kv', { params })
+    const keys = response.data.keys
+    if (!keys.length) { console.log('Cache is empty.'); return }
+    console.log(chalk.cyan('\nCache keys (' + keys.length + (response.data.truncated ? '+' : '') + ')\n'))
+    for (const k of keys) console.log('  ' + chalk.yellow(k.key) + (k.ttl === null ? chalk.dim('  · no expiry') : chalk.dim('  · ' + k.ttl + 's left')))
+  } catch (error) { kvError(error) }
+})
+program.command('kv:del <key>').description('Delete a cache key').action(async (key) => {
+  try { await kvClient().delete('/api/kv/' + encodeURIComponent(key)); console.log(chalk.green(key + ' deleted')) } catch (error) { kvError(error) }
+})
+program.command('kv:flush').description('Delete every cache key in this project').option('--yes', 'Skip the confirmation prompt').action(async (options) => {
+  if (!options.yes) {
+    const { sure } = await inquirer.prompt([{ type: 'confirm', name: 'sure', message: 'Delete every cache key for this project?', default: false }])
+    if (!sure) { console.log('Aborted.'); return }
+  }
+  try { const response = await kvClient().post('/api/kv/flush'); console.log(chalk.green('Flushed ' + response.data.deleted + ' key(s)')) } catch (error) { kvError(error) }
+})
+// ==========================================================================
 // CRON — schedule HTTP calls from the API. Schedules are human strings:
 //   5m, 30s, 2h, daily 09:30, mon 09:00  (all UTC)
 // ==========================================================================
@@ -338,6 +384,105 @@ program.command('cron:rm <name>').description('Delete a cron job').action(async 
     if (!job) { console.log(chalk.red('No cron job named "' + name + '".')); return }
     await authClientForJobs().delete('/api/projects/' + linkedProjectId() + '/cron/' + job.id)
     console.log(chalk.green('Deleted ' + name))
+  } catch (error) { console.log(chalk.red(error.response?.data?.error || error.message)) }
+})
+
+// ==========================================================================
+// MEDIA CDN — upload a file, get a Cloudflare-backed URL.
+//   dkit upload img.png            permanent URL (as long as you keep it)
+//   dkit share img.png             temporary link (15m default) for testing
+// Listing/cleanup is done against the linked project via the JWT.
+// ==========================================================================
+const MIME_BY_EXT = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+  '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.avif': 'image/avif',
+  '.mp4': 'video/mp4', '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
+  '.pdf': 'application/pdf', '.json': 'application/json', '.txt': 'text/plain',
+  '.zip': 'application/zip', '.csv': 'text/csv', '.woff2': 'font/woff2', '.woff': 'font/woff',
+}
+function guessMime(file) {
+  return MIME_BY_EXT[path.extname(file).toLowerCase()] || 'application/octet-stream'
+}
+async function uploadFile(file, { ttlSeconds }) {
+  const apiKey = getProjectApiKey()
+  const buf = fs.readFileSync(file)
+  const headers = {
+    'x-api-key': apiKey,
+    'x-filename': path.basename(file),
+    'x-content-type': guessMime(file),
+    'content-type': 'application/octet-stream',
+  }
+  if (ttlSeconds) headers['x-ttl'] = String(ttlSeconds)
+  const res = await axios.post(API_BASE + '/api/files', buf, { headers, maxBodyLength: Infinity, maxContentLength: Infinity })
+  return res.data
+}
+function printMedia(f) {
+  console.log('  ' + chalk.cyan(f.filename))
+  console.log('    URL:     ' + chalk.yellow(f.url))
+  console.log('    Key:     ' + chalk.dim(f.key))
+  console.log('    Size:    ' + chalk.dim((f.size / 1024).toFixed(1) + ' KB'))
+  if (f.expires_at) console.log('    Expires: ' + chalk.dim(f.expires_at) + chalk.dim(' (temporary link)'))
+}
+function parseTtl(input, fallbackSeconds) {
+  if (!input) return fallbackSeconds
+  const m = String(input).match(/^(\d+)\s*(s|m|h|d)?$/i)
+  if (!m) { console.log(chalk.red('Bad TTL — use seconds ("900") or "15m", "1h", "7d"')); process.exit(1) }
+  const mult = { s: 1, m: 60, h: 3600, d: 86400 }[(m[2] || 's').toLowerCase()]
+  return Number(m[1]) * mult
+}
+program.command('upload <files...>').description('Upload files to the media CDN; prints permanent URLs').option('--ttl <duration>', 'Optional expiry: 900, 15m, 1h, 7d (0 = never)')
+  .action(async (files, options) => {
+    const ttl = parseTtl(options.ttl, null)
+    if (ttl) { if (ttl < 60 || ttl > 30 * 24 * 3600) { console.log(chalk.red('TTL must be 1 minute to 30 days')); process.exit(1) } }
+    for (const file of files) {
+      if (!fs.existsSync(file) || !fs.statSync(file).isFile()) { console.log(chalk.red('Not a file: ' + file)); continue }
+      const spinner = ora('Uploading ' + file + '...').start()
+      try {
+        const data = await uploadFile(file, { ttlSeconds: ttl })
+        spinner.succeed(file)
+        printMedia(data)
+      } catch (error) { spinner.fail(file + ' failed'); console.log(chalk.red(error.response?.data?.error || error.message)) }
+    }
+  })
+program.command('share <file>').description('Upload with a temporary link (delete-safe way to test/shoot). Default 15m.').option('-t, --ttl <duration>', 'How long the link lives: 5m, 15m, 1h, 24h, 7d', '15m')
+  .action(async (file, options) => {
+    const ttl = parseTtl(options.ttl, 900)
+    if (ttl < 60 || ttl > 30 * 24 * 3600) { console.log(chalk.red('TTL must be 1 minute to 30 days')); process.exit(1) }
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) { console.log(chalk.red('Not a file: ' + file)); process.exit(1) }
+    const spinner = ora('Uploading ' + file + ' (temporary link)...').start()
+    try {
+      const data = await uploadFile(file, { ttlSeconds: ttl })
+      spinner.succeed('Temporary link is live')
+      console.log(chalk.bold.cyan('\n  ' + data.url + '\n'))
+      console.log('Valid for ' + chalk.yellow(options.ttl) + ' — it self-destructs after that. Nobody can guess the URL.')
+    } catch (error) { spinner.fail('Upload failed'); console.log(chalk.red(error.response?.data?.error || error.message)) }
+  })
+program.command('files:list').description('List the linked project\'s media files').action(async () => {
+  const token = await getUserToken()
+  try {
+    const r = await authClientForJobs().get('/api/projects/' + linkedProjectId() + '/files')
+    const files = r.data.files
+    if (files.length === 0) { console.log('No files yet. Upload one: dkit upload logo.png'); return }
+    console.log(chalk.cyan('\nMedia files (' + files.length + ' total)\n'))
+    files.forEach(printMedia)
+  } catch (error) { console.log(chalk.red(error.response?.data?.error || error.message)) }
+})
+program.command('files:url <key>').description('Print the public URL for a file key').action(async (key) => {
+  const token = await getUserToken()
+  try {
+    const files = (await authClientForJobs().get('/api/projects/' + linkedProjectId() + '/files')).data.files
+    const f = files.find((x) => x.key === key)
+    if (!f) { console.log(chalk.red('No file with key "' + key + '" in this project.')); return }
+    console.log(f.url)
+  } catch (error) { console.log(chalk.red(error.response?.data?.error || error.message)) }
+})
+program.command('files:rm <key>').description('Delete a media file (URL stops working immediately)').action(async (key) => {
+  const token = await getUserToken()
+  const { sure } = await inquirer.prompt([{ type: 'confirm', name: 'sure', message: 'Delete file ' + key + ' permanently?', default: false }])
+  if (!sure) { console.log('Aborted.'); return }
+  try {
+    await authClientForJobs().delete('/api/projects/' + linkedProjectId() + '/files/' + encodeURIComponent(key))
+    console.log(chalk.green('Deleted ' + key))
   } catch (error) { console.log(chalk.red(error.response?.data?.error || error.message)) }
 })
 

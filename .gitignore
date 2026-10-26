@@ -65,4 +65,8 @@ skills-lock.json
 id_rsa
 id_ed25519
 *_ed25519
-.freebuff/project-id.tmp-*
+# Local machine/agent state and copied-in credentials
+.freebuff/
+backend/logs/
+*credentials*.json
+keys.txt

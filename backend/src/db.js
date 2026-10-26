@@ -223,6 +223,31 @@ await pool.query(`CREATE INDEX IF NOT EXISTS idx_logs_project_ts ON log_entries 
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_logs_project_level ON log_entries (project_id, level)`)
 
 // ---------------------------------------------------------------------------
+// Media files: an image/file CDN on Cloudflare R2. Bytes live in the bucket
+// (so a packed VPS never holds them), this table carries only metadata. `key`
+// is the unguessable public slug embedded in /f/<key> URLs; r2_key is the full
+// storage path inside the bucket. Temporary uploads carry expires_at — the job
+// runner deletes expired rows (and their objects) within a minute of expiry.
+// ---------------------------------------------------------------------------
+await pool.query(`CREATE TABLE IF NOT EXISTS media_files (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  key TEXT UNIQUE NOT NULL,
+  r2_key TEXT UNIQUE NOT NULL,
+  filename TEXT NOT NULL,
+  content_type TEXT NOT NULL,
+  byte_size INTEGER NOT NULL,
+  sha256 TEXT,
+  expires_at TIMESTAMP,
+  deleted_at TIMESTAMP,
+  hits INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW()
+)`)
+await pool.query(`CREATE INDEX IF NOT EXISTS idx_media_project ON media_files (project_id, created_at DESC)`)
+await pool.query(`CREATE INDEX IF NOT EXISTS idx_media_expiry ON media_files (expires_at) WHERE expires_at IS NOT NULL AND deleted_at IS NULL`)
+
+// ---------------------------------------------------------------------------
 // Public status page (dkit.name.ng/status). Dkit watches its own services
 // with the same prober that powers user monitors, but with admin control on
 // top: an admin can force a service up/down for maintenance and post incidents.

@@ -145,6 +145,15 @@ const projectAuth = (token, projectId) => ({
   'x-project-id': projectId,
 });
 
+// Query string for the cache list (prefix/limit), used by projectKvList.
+const kvQuery = (prefix, limit) => {
+  const p = new URLSearchParams();
+  if (prefix) p.set('prefix', prefix);
+  if (limit) p.set('limit', String(limit));
+  const s = p.toString();
+  return s ? '?' + s : '';
+};
+
 // ---------------------------------------------------------------------------
 // Key vault (localStorage). Reveal/copy of a full API key only works for keys
 // the user has saved into THIS browser (they're shown once server-side, hashed
@@ -305,6 +314,32 @@ method: 'POST',
 headers: projectAuth(token, projectId),
 body: JSON.stringify({ by }),
 }),
+
+// Cache KV (Redis-backed): raw string values, TTL in seconds, atomic incr.
+// Unlike projectStore* above, entries are evictable and never the only copy.
+projectKvList: (token, projectId, { prefix = '', limit = 100 } = {}) =>
+request(`/kv${kvQuery(prefix, limit)}`, { headers: projectAuth(token, projectId) }),
+projectKvGet: (token, projectId, key) =>
+request(`/kv/${encodeURIComponent(key)}`, { headers: projectAuth(token, projectId) }),
+projectKvSet: (token, projectId, key, value, ttl) =>
+request(`/kv/${encodeURIComponent(key)}${ttl ? `?ttl=${Number(ttl)}` : ''}`, {
+method: 'PUT',
+headers: { ...projectAuth(token, projectId), 'Content-Type': 'text/plain' },
+body: String(value),
+}),
+projectKvDelete: (token, projectId, key) =>
+request(`/kv/${encodeURIComponent(key)}`, {
+method: 'DELETE',
+headers: projectAuth(token, projectId),
+}),
+projectKvIncrement: (token, projectId, key, by = 1) =>
+request(`/kv/${encodeURIComponent(key)}/incr`, {
+method: 'POST',
+headers: projectAuth(token, projectId),
+body: JSON.stringify({ by }),
+}),
+projectKvFlush: (token, projectId) =>
+request('/kv/flush', { method: 'POST', headers: projectAuth(token, projectId) }),
 projectEnvImport: (token, projectId, vars, environment = 'production') =>
 request('/env/import', {
 method: 'POST',
@@ -360,6 +395,43 @@ monitorDelete: (token, projectId, monitorId) =>
 request(`/projects/${projectId}/monitors/${monitorId}`, { method: 'DELETE', headers: auth(token) }),
 monitorChecks: (token, projectId, monitorId) =>
 request(`/projects/${projectId}/monitors/${monitorId}/checks`, { headers: auth(token) }),
+
+// Media CDN: list / delete go through the standard JSON request path. Upload
+// is its own thing — it sends the raw file bytes plus metadata headers, so it
+// can't ride the JSON content-type wrapper `request()` adds. It keeps the same
+// silent-refresh-and-retry semantics, one retry only.
+mediaList: (token, projectId) =>
+request(`/projects/${projectId}/files`, { headers: auth(token) }),
+mediaDelete: (token, projectId, key) =>
+request(`/projects/${projectId}/files/${encodeURIComponent(key)}`, { method: 'DELETE', headers: auth(token) }),
+mediaUpload: async (token, projectId, file, ttlSeconds) => {
+const send = async (bearer) => {
+const res = await fetch('/api/files', {
+method: 'POST',
+headers: {
+Authorization: `Bearer ${bearer}`,
+'x-project-id': projectId,
+'x-filename': file.name.slice(0, 200),
+'x-content-type': file.type || 'application/octet-stream',
+...(ttlSeconds ? { 'x-ttl': String(ttlSeconds) } : {}),
+...(readAuth()?.user?.email ? { 'x-dkit-actor': readAuth().user.email } : {}),
+},
+body: file,
+});
+return { status: res.status, ok: res.ok, data: await res.json().catch(() => null) };
+};
+let attempt = await send(token);
+if (attempt.status === 401 && attempt.data?.code === 'token_expired') {
+const refreshed = await refreshSession();
+if (refreshed) attempt = await send(refreshed.token);
+}
+if (!attempt.ok) {
+const err = new Error(attempt.data?.error || `Upload failed (${attempt.status})`);
+err.status = attempt.status;
+throw err;
+}
+return attempt.data;
+},
 
 // Logs
 logsList: (token, projectId, { level, search, before } = {}) => {

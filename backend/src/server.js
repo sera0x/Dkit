@@ -3,12 +3,13 @@ const cors = require('cors')
 const path = require('path')
 const rateLimit = require('express-rate-limit')
 const helmet = require('helmet')
-const { pool, initPromise } = require('./db')
+const { pool, redisClient, initPromise } = require('./db')
 const { hashPassword, verifyPassword, generateToken, authenticate, authenticateProject, newRefreshToken, hashRefreshToken, verifyToken } = require('./auth')
 const { sendVerificationCode, sendLoginCode, sendPasswordResetEmail, sendTeamInviteEmail, sendWelcomeEmail, sendAdminBroadcastEmail } = require('./email')
 const jobs = require('./jobs')
 const status = require('./status')
 const { isTeamMember, isTeamWriteable, projectAccessFor, sharedTeamIdsForProject, listSharedProjects } = require('./teamAccess')
+const r2 = require('./r2')
 const { generateSecret, verifyTotp, otpauthUrl } = require('./totp')
 const crypto = require('crypto')
 const app = express()
@@ -75,9 +76,19 @@ async function issueSession(userId, req) {
   )
   return { token, refresh_token: refreshToken }
 }
-const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many requests. Please slow down.' } })
+// Cache reads are meant to be frequent (an app may hit /api/kv hundreds of
+// times a minute), so /api/kv skips the 300-per-15-minutes human limiter and
+// gets its own per-key budget instead.
+const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false, skip: (req) => req.originalUrl.startsWith('/api/kv'), message: { error: 'Too many requests. Please slow down.' } })
 app.use('/api/', globalLimiter)
 const projectLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false, keyGenerator: (req) => req.headers['x-api-key'] || req.ip, message: { error: 'Too many requests for this API key. Please slow down.' } })
+const kvLimiter = rateLimit({ windowMs: 60 * 1000, max: Number(process.env.KV_RATE_LIMIT) || 1200, standardHeaders: true, legacyHeaders: false, keyGenerator: (req) => req.headers['x-api-key'] || req.ip, message: { error: 'Cache rate limit exceeded. Raise KV_RATE_LIMIT if this is a real workload.' } })
+// Cache values are small on purpose: 128 KB by default, hard-capped by
+// KV_MAX_BYTES. Keys are URL/SCAN-safe (no spaces, slashes or glob chars), so
+// a prefix listing can never smuggle a wildcard into the Redis MATCH pattern.
+const KV_MAX_BYTES = Number(process.env.KV_MAX_BYTES) || 128 * 1024
+const KV_MAX_TTL = 30 * 24 * 60 * 60
+const KV_KEY_RE = /^[A-Za-z0-9._:-]{1,128}$/
 // Failed password / code / token attempts only (successful requests are NOT counted).
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 15, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many failed attempts. Please wait a few minutes and try again.' } })
 // Anything that actually sends an email (only successful sends count), keyed per IP + target email.
@@ -515,8 +526,11 @@ app.get('/api/projects/:id/audit', authenticate, async (req, res) => {
 })
 app.delete('/api/projects/:id', authenticate, async (req, res) => {
 const { id } = req.params
-await pool.query('DELETE FROM projects WHERE id = $1 AND user_id = $2', [id, req.user.id])
-// team_projects rows go too (ON DELETE CASCADE)
+const deleted = await pool.query('DELETE FROM projects WHERE id = $1 AND user_id = $2 RETURNING id', [id, req.user.id])
+// team_projects rows go too (ON DELETE CASCADE). The Redis cache lives outside
+// Postgres, so purge its namespace explicitly — only if we really deleted the
+// project, so nobody can flush a project they don't own by guessing its id.
+if (deleted.rows.length) await clearProjectCache(id).catch(() => {})
 res.json({ success: true, message: 'Project deleted' })
 })
 
@@ -788,6 +802,157 @@ app.delete('/api/projects/:id/logs', authenticate, async (req, res) => {
   res.json({ ok: true })
 })
 
+// ---------------------------------------------------------------------------
+// Media CDN: upload a file, get a Cloudflare-backed URL. Bytes live in an R2
+// bucket (never on this VPS — RAM is precious); Postgres keeps metadata only.
+//   POST /api/files        (x-api-key OR session)  raw body upload
+//   GET  /f/:key           public — serves permanent files (redirects to the
+//                          CDN host when R2_PUBLIC_BASE is set) and temp links
+//   GET  /api/projects/:id/files   (session) list
+//   DELETE /api/projects/:id/files/:key  (session) delete
+// Temporary uploads carry a TTL: `x-ttl` seconds. Expired files return 410 and
+// are swept (object + row) by the job runner within a minute.
+// Each key is 12 chars of url-safe randomness — URLs are unguessable like the
+// one-time login links; there is no directory listing by design.
+// ---------------------------------------------------------------------------
+const FILE_MAX_BYTES = Number(process.env.MEDIA_MAX_BYTES) || 15 * 1024 * 1024
+const FILE_MIN_TTL = 60               // 1 minute
+const FILE_MAX_TTL = 30 * 24 * 3600   // 30 days
+const CONTENT_TYPE_RE = /^[\w.+-]+\/[\w.+-]+$/
+
+function fileUrlFor(row) {
+  const base = String(process.env.PUBLIC_URL || '').replace(/\/+$/, '')
+  return (base || '') + '/f/' + row.key
+}
+function safeFilename(raw) {
+  const name = String(raw || 'file').split(/[\\/]/).pop().slice(0, 200).trim()
+  return name || 'file'
+}
+function newFileKey() { return crypto.randomBytes(9).toString('base64url') } // 12 chars, URL-safe
+
+app.post('/api/files', projectLimiter, authenticateProject, express.raw({ type: () => true, limit: FILE_MAX_BYTES }), async (req, res) => {
+  if (!(req.headers['content-length'] || '').trim() && req.body?.length === 0) return res.status(400).json({ error: 'Empty file' })
+  if (!req.body || req.body.length === 0) return res.status(400).json({ error: 'Empty file' })
+  const filename = safeFilename(req.headers['x-filename'])
+  const contentType = CONTENT_TYPE_RE.test(String(req.headers['x-content-type'] || '')) ? String(req.headers['x-content-type']) : 'application/octet-stream'
+  const ttlSeconds = req.headers['x-ttl'] ? Number(req.headers['x-ttl']) : null
+  if (req.headers['x-ttl'] && (!Number.isFinite(ttlSeconds) || ttlSeconds < FILE_MIN_TTL || ttlSeconds > FILE_MAX_TTL)) {
+    return res.status(400).json({ error: `TTL must be between ${FILE_MIN_TTL} and ${FILE_MAX_TTL} seconds` })
+  }
+
+  try {
+    await r2.ensureReady()
+  } catch (err) {
+    console.error('media upload not ready:', err.message)
+    return res.status(err.status && err.status !== 500 ? err.status : 500).json({ error: err.message })
+  }
+
+  const key = newFileKey()
+  const r2Key = `u/${req.project.id}/${key}`
+  const sha256 = crypto.createHash('sha256').update(req.body).digest('hex')
+  try {
+    // Bytes first, then metadata — a failed upload leaves no lying row behind.
+    await r2.putObject(r2Key, req.body, contentType)
+    const expires = ttlSeconds ? new Date(Date.now() + ttlSeconds * 1000) : null
+    const ins = await pool.query(
+      `INSERT INTO media_files (project_id, user_id, key, r2_key, filename, content_type, byte_size, sha256, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (key) DO NOTHING RETURNING *`,
+      [req.project.id, req.project.user_id, key, r2Key, filename, contentType, req.body.length, sha256, expires]
+    )
+    if (ins.rows.length === 0) return res.status(409).json({ error: 'Key collision — try again' })
+    const row = ins.rows[0]
+    res.json({
+      key: row.key,
+      filename: row.filename,
+      content_type: row.content_type,
+      size: row.byte_size,
+      sha256: row.sha256,
+      expires_at: row.expires_at,
+      url: fileUrlFor(row),
+    })
+  } catch (err) {
+    console.error('media upload error:', err)
+    res.status(500).json({ error: 'Could not store file' })
+  }
+})
+
+const publicFileLimiter = rateLimit({ windowMs: 60 * 1000, max: 600, standardHeaders: true, legacyHeaders: false })
+app.get('/f/:key', publicFileLimiter, async (req, res) => {
+  const key = String(req.params.key || '').slice(0, 40)
+  if (!/^[\w-]{4,40}$/.test(key)) return res.status(404).json({ error: 'Not found' })
+  const r = await pool.query('SELECT * FROM media_files WHERE key = $1 AND deleted_at IS NULL', [key])
+  const row = r.rows[0]
+  if (!row) return res.status(404).json({ error: 'Not found' })
+  if (row.expires_at && new Date(row.expires_at) <= new Date()) {
+    return res.status(410).json({ error: 'This link has expired.' })
+  }
+  // CDN configured and this file is permanent → let Cloudflare serve it.
+  const base = r2.publicBase()
+  if (base && !row.expires_at) {
+    return res.redirect(302, base + '/' + row.r2_key.split('/').map(encodeURIComponent).join('/'))
+  }
+  try {
+    const upstream = await r2.getObject(row.r2_key)
+    res.setHeader('Content-Type', row.content_type)
+    res.setHeader('Content-Length', row.byte_size)
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    // Unique random keys are immutable, so permanent files cache hard. Temp
+    // links must never stick in a cache. The sandbox CSP keeps served HTML/SVG
+    // from executing anything — plain bytes, not a page running with our cookies.
+    res.setHeader('Cache-Control', row.expires_at ? 'no-store' : 'public, max-age=31536000, immutable')
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox")
+    if (!row.expires_at) pool.query('UPDATE media_files SET hits = hits + 1 WHERE id = $1', [row.id]).catch(() => {})
+    // Node's fetch hands back a web ReadableStream; some runtimes and proxies
+    // give extended Node streams. Bridge web → node when needed, then pipe.
+    const bodyStream = upstream.body
+    const nodeReadable = bodyStream && typeof bodyStream.on === 'function' ? bodyStream : require('stream').Readable.fromWeb(bodyStream)
+    nodeReadable.pipe(res)
+  } catch (err) {
+    if (err.status === 404) return res.status(404).json({ error: 'Not found' })
+    console.error('media serve error:', err.message)
+    res.status(502).json({ error: 'Could not load file from storage' })
+  }
+})
+
+// Both auth paths resolve the project; session path honours team membership —
+// uploads land in the project even when a teammate uploads from the dashboard.
+async function mediaAccessGuard(req, res, next) {
+  if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Project not found' })
+  if (!(await projectAccessFor(req.params.id, req.user.id))) return res.status(404).json({ error: 'Project not found' })
+  next()
+}
+
+app.get('/api/projects/:id/files', authenticate, mediaAccessGuard, async (req, res) => {
+  const r = await pool.query(
+    `SELECT id, key, filename, content_type, byte_size, sha256, expires_at, hits, created_at
+     FROM media_files WHERE project_id = $1 AND deleted_at IS NULL
+     ORDER BY created_at DESC LIMIT 300`
+  , [req.params.id])
+  res.json({ files: r.rows.map((row) => ({ ...row, url: fileUrlFor(row) })) })
+})
+
+app.delete('/api/projects/:id/files/:key', authenticate, mediaAccessGuard, async (req, res) => {
+  const key = String(req.params.key || '').slice(0, 40)
+  if (!/^[\w-]{4,40}$/.test(key)) return res.status(404).json({ error: 'File not found' })
+  const r = await pool.query(
+    'SELECT * FROM media_files WHERE project_id = $1 AND key = $2 AND deleted_at IS NULL',
+    [req.params.id, key]
+  )
+  if (r.rows.length === 0) return res.status(404).json({ error: 'File not found' })
+  // Delete the bytes first — a failed row-mark is swept up by the job runner,
+  // but a marked row with live bytes would keep the object billed.
+  try {
+    await r2.deleteObject(r.rows[0].r2_key)
+  } catch (err) {
+    console.error('R2 delete failed for ' + key + ':', err.message)
+    return res.status(502).json({ error: 'File removed from the listing, but storage did not confirm deletion. It will be retried.' })
+  }
+  await pool.query('UPDATE media_files SET deleted_at = NOW() WHERE id = $1', [r.rows[0].id])
+  res.json({ ok: true })
+})
+
+
 app.get('/api/env', projectLimiter, authenticateProject, async (req, res) => {
 const { environment } = req.query
 // mask=1: values never leave the server — the response carries only keys and
@@ -930,6 +1095,193 @@ if (prefix) { params.push(prefix + '%'); query += ` AND key LIKE $${params.lengt
 const result = await pool.query(query, params)
 res.json({ keys: result.rows, count: result.rows.length })
 })
+
+// ---------------------------------------------------------------------------
+// Cache KV — the Redis-backed counterpart to the Postgres `store` above.
+//
+// The contract is deliberately different from `store`:
+//   store  = durable JSON in Postgres (the only copy of your data)
+//   cache  = fast, TTL-first Redis strings (evictable, never the only copy)
+//
+// Storage layout: dkit:kv:<project-id>:<key>. The project id lives in the key
+// itself, so two projects can use the same key name, listing is a single SCAN
+// over that prefix, and deleting a project can purge its keyspace exactly.
+// Redis runs with maxmemory 64mb + allkeys-lru, so nothing here is promised
+// persistence — that is the point of a cache.
+// ---------------------------------------------------------------------------
+const cachePrefix = (projectId) => `dkit:kv:${projectId}:`
+const cacheKey = (projectId, key) => cachePrefix(projectId) + key
+
+// Accepts raw text/plain (curl, apps), a JSON string, or {value, ttl} from
+// the dashboard/CLI. Objects are stored as JSON text.
+function kvValue(body) {
+  if (body === undefined || body === null) return ''
+  if (typeof body === 'string') return body
+  if (Buffer.isBuffer(body)) return body.toString('utf8')
+  if (typeof body === 'object') {
+    const v = Object.prototype.hasOwnProperty.call(body, 'value') ? body.value : body
+    return typeof v === 'string' ? v : JSON.stringify(v)
+  }
+  return String(body)
+}
+
+// Returns { ttl } on success or { error } on a bad value. 0/empty = no expiry.
+function kvTtl(raw) {
+  if (raw === undefined || raw === null || raw === '') return { ttl: null }
+  const n = Number(raw)
+  if (!Number.isInteger(n) || n < 0 || n > KV_MAX_TTL) {
+    return { error: `ttl must be an integer between 0 and ${KV_MAX_TTL} seconds` }
+  }
+  return { ttl: n === 0 ? null : n }
+}
+
+const kvTextParser = express.text({ type: () => true, limit: KV_MAX_BYTES })
+function readKvValue(req, res, next) {
+  kvTextParser(req, res, (err) => {
+    if (!err) return next()
+    if (err.type === 'entity.too.large') {
+      return res.status(413).json({ error: `Value too large (max ${KV_MAX_BYTES} bytes)` })
+    }
+    return res.status(400).json({ error: 'Could not read request body' })
+  })
+}
+
+async function scanProjectCache(projectId, prefix, limit) {
+  const match = cachePrefix(projectId) + prefix + '*'
+  const found = new Set()
+  let cursor = '0'
+  do {
+    const page = await redisClient.scan(cursor, { MATCH: match, COUNT: 250 })
+    cursor = String(page.cursor)
+    for (const k of page.keys) found.add(k.slice(cachePrefix(projectId).length))
+    if (found.size >= limit) break
+  } while (cursor !== '0')
+  const keys = [...found].slice(0, limit)
+  const multi = redisClient.multi()
+  for (const k of keys) multi.ttl(cacheKey(projectId, k))
+  const ttls = keys.length ? await multi.exec() : []
+  return {
+    keys: keys.map((k, i) => ({ key: k, ttl: ttls[i] > 0 ? ttls[i] : null })),
+    truncated: found.size > keys.length || cursor !== '0',
+  }
+}
+
+async function clearProjectCache(projectId) {
+  let cursor = '0'
+  let deleted = 0
+  do {
+    const page = await redisClient.scan(cursor, { MATCH: cachePrefix(projectId) + '*', COUNT: 500 })
+    cursor = String(page.cursor)
+    if (page.keys.length) deleted += await redisClient.unlink(page.keys)
+  } while (cursor !== '0')
+  return deleted
+}
+
+app.get('/api/kv', kvLimiter, authenticateProject, async (req, res) => {
+  const prefix = String(req.query.prefix || '')
+  if (prefix && !KV_KEY_RE.test(prefix)) return res.status(400).json({ error: 'Invalid prefix (letters, digits, . _ : - only)' })
+  const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500)
+  try {
+    const result = await scanProjectCache(req.project.id, prefix, limit)
+    res.set('Cache-Control', 'no-store')
+    res.json({ ...result, count: result.keys.length })
+  } catch (err) {
+    console.error('cache list failed:', err.message)
+    res.status(503).json({ error: 'Cache unavailable' })
+  }
+})
+
+app.post('/api/kv/flush', kvLimiter, authenticateProject, async (req, res) => {
+  try {
+    const deleted = await clearProjectCache(req.project.id)
+    res.json({ deleted })
+  } catch (err) {
+    console.error('cache flush failed:', err.message)
+    res.status(503).json({ error: 'Cache unavailable' })
+  }
+})
+
+// GET ?raw=1 returns the value itself (for apps/curl); the default is a JSON
+// envelope with the remaining TTL so the CLI and dashboard can show it.
+app.get('/api/kv/:key', kvLimiter, authenticateProject, async (req, res) => {
+  if (!KV_KEY_RE.test(req.params.key)) return res.status(400).json({ error: 'Invalid key (1-128 of A-Z a-z 0-9 . _ : -)' })
+  try {
+    const value = await redisClient.get(cacheKey(req.project.id, req.params.key))
+    if (value === null) return res.status(404).json({ error: 'Key not found' })
+    const ttl = await redisClient.ttl(cacheKey(req.project.id, req.params.key))
+    res.set('Cache-Control', 'no-store')
+    if (req.query.raw === '1') {
+      res.set('x-kv-ttl', String(ttl === -1 ? 'none' : ttl))
+      return res.type('text/plain').send(value)
+    }
+    res.json({ key: req.params.key, value, ttl: ttl === -1 ? null : ttl })
+  } catch (err) {
+    console.error('cache get failed:', err.message)
+    res.status(503).json({ error: 'Cache unavailable' })
+  }
+})
+
+app.put('/api/kv/:key', kvLimiter, authenticateProject, readKvValue, async (req, res) => {
+  if (!KV_KEY_RE.test(req.params.key)) return res.status(400).json({ error: 'Invalid key (1-128 of A-Z a-z 0-9 . _ : -)' })
+  const value = kvValue(req.body)
+  const bytes = Buffer.byteLength(value)
+  if (bytes > KV_MAX_BYTES) return res.status(413).json({ error: `Value too large (max ${KV_MAX_BYTES} bytes)` })
+  const ttlInput = req.query.ttl !== undefined ? req.query.ttl
+    : (req.body && typeof req.body === 'object' && req.body.ttl !== undefined) ? req.body.ttl
+    : req.headers['x-ttl']
+  const parsed = kvTtl(ttlInput)
+  if (parsed.error) return res.status(400).json({ error: parsed.error })
+  try {
+    const key = cacheKey(req.project.id, req.params.key)
+    if (parsed.ttl) await redisClient.set(key, value, { EX: parsed.ttl })
+    else await redisClient.set(key, value)
+    res.json({ key: req.params.key, bytes, ttl: parsed.ttl })
+  } catch (err) {
+    console.error('cache set failed:', err.message)
+    res.status(503).json({ error: 'Cache unavailable' })
+  }
+})
+
+// Redis INCRBY is atomic. SET NX with the TTL only runs when the counter does
+// not exist yet, so increments never reset an existing window or TTL.
+app.post('/api/kv/:key/incr', kvLimiter, authenticateProject, async (req, res) => {
+  if (!KV_KEY_RE.test(req.params.key)) return res.status(400).json({ error: 'Invalid key (1-128 of A-Z a-z 0-9 . _ : -)' })
+  const by = req.body === undefined || req.body?.by === undefined ? 1 : Number(req.body.by)
+  if (!Number.isSafeInteger(by) || Math.abs(by) > 1e12) return res.status(400).json({ error: 'by must be a safe integer' })
+  const parsed = kvTtl(req.query.ttl !== undefined ? req.query.ttl : req.body?.ttl)
+  if (parsed.error) return res.status(400).json({ error: parsed.error })
+  try {
+    const key = cacheKey(req.project.id, req.params.key)
+    if (parsed.ttl) await redisClient.set(key, '0', { NX: true, EX: parsed.ttl })
+    let value
+    try {
+      value = await redisClient.incrBy(key, by)
+    } catch (err) {
+      if (/not an integer/i.test(err.message)) {
+        return res.status(400).json({ error: 'Existing value is not an integer; set it with PUT first' })
+      }
+      throw err
+    }
+    const ttl = await redisClient.ttl(key)
+    res.json({ key: req.params.key, value, ttl: ttl === -1 ? null : ttl })
+  } catch (err) {
+    console.error('cache incr failed:', err.message)
+    res.status(503).json({ error: 'Cache unavailable' })
+  }
+})
+
+app.delete('/api/kv/:key', kvLimiter, authenticateProject, async (req, res) => {
+  if (!KV_KEY_RE.test(req.params.key)) return res.status(400).json({ error: 'Invalid key (1-128 of A-Z a-z 0-9 . _ : -)' })
+  try {
+    const deleted = await redisClient.unlink(cacheKey(req.project.id, req.params.key))
+    if (!deleted) return res.status(404).json({ error: 'Key not found' })
+    res.json({ deleted: true })
+  } catch (err) {
+    console.error('cache delete failed:', err.message)
+    res.status(503).json({ error: 'Cache unavailable' })
+  }
+})
+
 app.post('/api/auth/forgot-password', emailLimiter, async (req, res) => {
 const { email } = req.body
 if (!email) return res.status(400).json({ error: 'Email required' })
@@ -1502,8 +1854,10 @@ app.use((req, res, next) => { if (req.path.startsWith('/api/')) return next(); r
   await initPromise            // schema + one-time API-key hashing migration
   await ensureSelfProject()    // dkit-self exists and carries PUBLIC_URL
   await loadSelfSettings()     // then let the dkit-self project fill env gaps
-  jobs.startJobs()             // cron scheduler + monitor prober + log retention
-  await status.ensureSeed()    // status page: API/Website/Docs services
+  // The job runner double-fires when a second instance shares the DB for local
+  // dev — DKIT_DISABLE_JOBS=1 opts a dev instance out.
+  if (process.env.DKIT_DISABLE_JOBS === '1') console.log('Job runner disabled (DKIT_DISABLE_JOBS=1)')
+  else jobs.startJobs()       // cron scheduler + monitor prober + log retention  await status.ensureSeed()    // status page: API/Website/Docs services
   status.startStatusProbes()   // status page prober + uptime rollups
   // Bind to loopback only: the Cloudflare tunnel reaches us via localhost, so
   // port 3001 is never directly reachable from the internet.

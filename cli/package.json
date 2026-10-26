@@ -1,7 +1,7 @@
 {
   "name": "dkit-cli",
-  "version": "0.1.0",
-  "description": "Dkit CLI - secrets, scaffolding, cron jobs, uptime monitors, and log shipping from one command",
+  "version": "0.3.0",
+  "description": "Dkit CLI - secrets, caching, cron jobs, uptime monitors, log shipping, and a media CDN from one command",
   "license": "MIT",
   "bin": {
     "dkit": "./bin/dkit.js"

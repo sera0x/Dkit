@@ -7,10 +7,12 @@
 //   - Monitors: probes every due monitor, tracks up/down state, and emails the
 //     project owner on state flips (after 2 consecutive failures).
 //   - Logs: hourly cleanup of log entries older than 7 days.
+//   - Media: temp uploads past their TTL lose their bucket object and row.
 //
 // Uses global fetch (Node >= 18) — the same runtime Resend already requires.
 
 const { pool } = require('./db')
+const r2 = require('./r2')
 const { sendUptimeAlertEmail } = require('./email')
 
 const TICK_MS = 30 * 1000        // how often we look for due work
@@ -228,6 +230,32 @@ async function pruneLogs() {
 }
 
 // ---------------------------------------------------------------------------
+// Media retention: expired temp uploads are swept here within a tick. The
+// bucket object is deleted first; only then is the row marked deleted, so a
+// crash between the two just retries (a marked row with no object is harmless,
+// the reverse keeps paying for bytes nobody can reach — those never happen).
+// ---------------------------------------------------------------------------
+async function sweepMediaExpiry() {
+  if (!r2.configured()) return 0
+  const due = await pool.query(
+    `SELECT id, r2_key FROM media_files
+     WHERE expires_at IS NOT NULL AND deleted_at IS NULL AND expires_at <= NOW()
+     LIMIT 50`
+  )
+  let swept = 0
+  for (const row of due.rows) {
+    try {
+      await r2.deleteObject(row.r2_key)
+      await pool.query('UPDATE media_files SET deleted_at = NOW() WHERE id = $1', [row.id])
+      swept++
+    } catch (err) {
+      console.error('media sweep failed for ' + row.r2_key + ':', err.message)
+    }
+  }
+  return swept
+}
+
+// ---------------------------------------------------------------------------
 // Main loop. `busy` keeps overlapping ticks from piling up when the network
 // is slow — a slow batch of probes just delays the next tick.
 // ---------------------------------------------------------------------------
@@ -240,6 +268,8 @@ function startJobs() {
     try {
       const cronRan = await runDueCronJobs()
       const probesRan = await runDueMonitors()
+      const mediaSwept = await sweepMediaExpiry()
+      if (mediaSwept > 0) console.log('jobs: swept ' + mediaSwept + ' expired media file(s)')
       if (Date.now() - lastLogPrune > 60 * 60 * 1000) {
         lastLogPrune = Date.now()
         const pruned = await pruneLogs()
@@ -257,4 +287,4 @@ function startJobs() {
   return timer
 }
 
-module.exports = { startJobs, parseSchedule, firstRunAt, describeSchedule, executeCronJob, recordCronRun, RETENTION_DAYS }
+module.exports = { startJobs, parseSchedule, firstRunAt, describeSchedule, executeCronJob, recordCronRun, sweepMediaExpiry, RETENTION_DAYS }

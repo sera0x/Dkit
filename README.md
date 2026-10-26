@@ -4,7 +4,7 @@
 
 <h1 align="center">Dkit</h1>
 
-<p align="center"><strong>Secrets, cron jobs, uptime checks, a log drain, and a JSON store — one CLI, one dashboard, one API. Self-hosted.</strong></p>
+<p align="center"><strong>Secrets, cron jobs, uptime checks, a log drain, a JSON store, a Redis cache, and an image CDN — one CLI, one dashboard, one API. Self-hosted.</strong></p>
 
 <p align="center">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-0c111d">
@@ -42,7 +42,7 @@ That brings up the API and the dashboard on `localhost:3001`. The schema creates
 | `JWT_SECRET` | Signs session tokens — `openssl rand -hex 32` |
 | `RESEND_API_KEY` | Sends verification codes, invites and uptime alerts |
 
-OAuth (Google, GitHub) stays hidden until both ID and secret are set. A VPS checklist is in [VPS-SETUP.md](VPS-SETUP.md); moving the whole stack to a new box is one archive — see [MIGRATION.md](MIGRATION.md).
+OAuth (Google, GitHub) stays hidden until both ID and secret are set. Media uploads need Cloudflare R2 credentials (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`); everything else works without them. A VPS checklist is in [VPS-SETUP.md](VPS-SETUP.md); moving the whole stack to a new box is one archive — see [MIGRATION.md](MIGRATION.md).
 
 ## What's in it
 
@@ -53,6 +53,8 @@ OAuth (Google, GitHub) stays hidden until both ID and secret are set. A VPS chec
 - **Monitors email once.** One alert when a URL goes down, one when it recovers. Granularity from 30 seconds to an hour.
 - **Log drain accepts anything that can POST.** Ship lines or JSON batches; tail with level and search filters; 7-day retention.
 - **A JSON key-value store** with optional TTL and atomic increments — for state that isn't a secret.
+- **A Redis-backed cache** — plain strings, atomic `INCR`, TTLs and prefix listing. Sub-millisecond, but deliberately evictable (64 MB, LRU): sessions, counters and hot reads, not the only copy of anything.
+- **An image/file CDN on Cloudflare R2.** Upload once, get an unguessable URL served by Cloudflare — the VPS holds bytes only in transit. `dkit upload logo.png` keeps a file; `dkit share shot.png --ttl 15m` makes a self-destructing test link that vanishes object-first from the bucket.
 - **Teams.** Owner/admin/member roles, projects shared into a team, invitations that only work for a verified address.
 - **Destructive actions type-to-confirm.** Projects and secrets confirm through a prompt, like a terminal.
 
@@ -65,7 +67,8 @@ flowchart LR
     CLI["dkit CLI"] -->|bearer token| API["Express API"]
     Web["React dashboard"] -->|session cookie| API
     API --> PG["Postgres\nsecrets, jobs, monitors, logs"]
-    API --> Redis["Redis\none-time codes"]
+    API --> Redis["Redis\nsession codes + cache KV"]
+    API --> R2["Cloudflare R2\nmedia CDN"]
     API --> Mail["Resend\nemail delivery"]
     Runner["Job runner\nsame process"] --> PG
     Runner -->|fires due cron + monitors| Hooks["your HTTP endpoints"]
@@ -96,6 +99,9 @@ flowchart LR
 | `dkit env:rollback <key>` / `env:history <key>` / `env:diff` / `env:copy` / `env:pull` / `env:push <file>` | History, audit feed, compare, sync, export, bulk-import |
 | `dkit run -- <command>` | Run a command with secrets injected, nothing written to disk |
 | `dkit store:set/get/incr` / `store:list` / `store:delete` | JSON store: values, TTL, atomic increments |
+| `dkit kv:set/get/incr` / `kv:list` / `kv:del` / `kv:flush` | Redis cache: TTL strings, atomic counters, prefix listing |
+| `dkit upload <files…>` / `files:list` / `files:url` / `files:rm` | Media CDN: upload, browse, resolve and delete files |
+| `dkit share <file> --ttl 15m` | Self-destructing temporary link for screenshots and test payloads |
 | `dkit cron:add <name> <url> -s "..."` / `cron:list` / `cron:runs` / `cron:run` / `cron:pause` / `cron:rm` | Schedule, inspect, run now, pause, delete |
 | `dkit monitor:add <name> <url>` / `monitor:list` / `monitor:pause` / `monitor:rm` | Watch a URL; email on down and recovery |
 | `dkit logs:ship` / `logs:tail` / `logs:clear` | Ship lines or JSON batches; tail with filters; delete all |

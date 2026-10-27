@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { BookOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import AppShell from '../components/app/AppShell';
+import { SITE_URL } from '../lib/site';
 import './docs.css';
 
-const API_BASE = 'https://dkit.name.ng';
+const API_BASE = SITE_URL;
 
 const PageHeader = ({ Icon, title, subtitle }) => (
   <div className="page-header">

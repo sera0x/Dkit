@@ -46,6 +46,8 @@ That brings up the API and the dashboard on `localhost:3001`. The schema creates
 
 OAuth (Google, GitHub) stays hidden until both ID and secret are set. Media uploads need Cloudflare R2 credentials (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`); everything else works without them. A VPS checklist is in [VPS-SETUP.md](VPS-SETUP.md); moving the whole stack to a new box is one archive — see [MIGRATION.md](MIGRATION.md).
 
+Set `PUBLIC_URL` in `backend/.env` to your public origin, and build the dashboard with `VITE_SITE_URL` set to the same origin, so OAuth callbacks, invite links and canonical URLs agree. Without `VITE_SITE_URL` the dashboard uses the origin it is served from. A minimal Cloudflare Tunnel ingress is in [`deploy/cloudflared/config.example.yml`](deploy/cloudflared/config.example.yml).
+
 ## What's in it
 
 - **Secrets are hashed at rest.** API keys and refresh tokens are SHA-256 hashes; the plaintext exists only in the response that issued them. Env listings are masked server-side; `env:get` reveals one value, and env history keeps lengths instead of values.

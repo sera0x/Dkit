@@ -70,3 +70,11 @@ id_ed25519
 backend/logs/
 *credentials*.json
 keys.txt
+
+# Local ops/dev scripts — not part of the public repo
+/scripts/backup-db.sh
+/scripts/disk-check.sh
+/scripts/package-release.sh
+/scripts/restore-db.sh
+/scripts/start.sh
+/website/start.sh

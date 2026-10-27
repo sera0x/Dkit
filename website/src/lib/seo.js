@@ -2,7 +2,9 @@
 // homepage defaults so crawlers that never run JS still see real meta; this
 // keeps the tab and the canonical honest on every other route (the site is a
 // single-page app, so the static head would otherwise say "homepage" everywhere).
-const SITE = 'https://dkit.name.ng';
+import { SITE_URL } from './site';
+
+const SITE = SITE_URL;
 
 const PAGES = {
   '/': {

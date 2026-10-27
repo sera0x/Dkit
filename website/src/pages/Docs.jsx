@@ -46,12 +46,6 @@ const CLI_COMMANDS = [
   ['dkit store:get <key>', 'Read a stored value.'],
   ['dkit store:list', 'List all stored keys with created/updated times.'],
   ['dkit store:delete <key>', 'Delete a stored key.'],
-  ['dkit kv:set <key> <value>', 'Cache a string in Redis, optionally with --ttl seconds. Fast but evictable.'],
-  ['dkit kv:get <key>', 'Read a cache value (prints the raw string).'],
-  ['dkit kv:incr <key> [amount]', 'Atomically increment a counter; --ttl starts its window.'],
-  ['dkit kv:list', 'List cache keys with the TTL left on each. --prefix filters.'],
-  ['dkit kv:del <key>', 'Delete one cache key.'],
-  ['dkit kv:flush', 'Delete every cache key in the project (asks first).'],
   ['dkit cron:add <name> <url>', 'Schedule an HTTP call from the API: -s "5m", "daily 09:30", "mon 09:00" (UTC). -m method, -b JSON body, -H header.'],
   ['dkit cron:list', 'List cron jobs for the linked project.'],
   ['dkit cron:runs <name>', 'Recent runs for a job: status, duration, errors.'],
@@ -62,11 +56,6 @@ const CLI_COMMANDS = [
   ['dkit monitor:list', 'List monitors and their live status.'],
   ['dkit monitor:pause <name>', 'Pause a monitor (--resume).'],
   ['dkit monitor:rm <name>', 'Delete a monitor.'],
-  ['dkit upload <files...>', 'Upload files to the media CDN, print permanent URLs. --ttl 15m / 1h / 7d to expire automatically.'],
-  ['dkit share <file>', 'Temporary self-destructing link (default 15m). Great for screenshots and test payloads. -t ttl.'],
-  ['dkit files:list', 'List the linked project\u2019s files with URLs, sizes and view counts.'],
-  ['dkit files:url <key>', 'Print the public URL for a file key.'],
-  ['dkit files:rm <key>', 'Delete a file — its URL stops working immediately.'],
   ['dkit.name.ng/status', 'Live status of Dkit\u2019s own services: API, Website, Docs. Auto-updates every 30s; incidents post here automatically.'],
   ['dkit logs:ship [msg]', 'Ship a log line (or piped JSON lines) to the drain. -l level, -s source, -m meta JSON.'],
   ['dkit logs:tail', 'Recent logs for the linked project. -l level, -q search, -n lines.'],
@@ -134,7 +123,6 @@ dkit logs:ship "it's alive"`}</CodeBlock>
             <li><code>Monitors</code>: uptime checks on your URLs, with email alerts on down and recovery.</li>
             <li><code>Logs</code>: a log drain your apps ship to over HTTP; tail it from the CLI or dashboard. 7-day retention.</li>
             <li><code>Store</code>: a JSON key-value store for app data (counters, sessions, anything small).</li>
-            <li><code>Cache</code>: the same idea on Redis — plain strings, atomic counters, TTLs. Faster than the store, but evictable: use it for sessions, counters and hot reads, never as the only copy of anything.</li>
             <li><code>API key</code>: the <code>dk_...</code> key that authenticates project calls from your code. The dashboard itself uses your login session; keys are hashed at rest and shown once.</li>
           </ul>
         </div>
@@ -210,27 +198,6 @@ curl ${API_BASE}/api/store -H "x-api-key: dk_your_key_here"
 
 # Delete a key
 curl -X DELETE ${API_BASE}/api/store/user:123 -H "x-api-key: dk_your_key_here"`}</CodeBlock>
-
-          <h3>Cache (Redis KV)</h3>
-          <CodeBlock>{`# Cache a string for 15 minutes (raw body)
-curl -X PUT "${API_BASE}/api/kv/session:abc?ttl=900" \\\
-  -H "x-api-key: dk_your_key_here" \\\
-  -H "Content-Type: text/plain" \\\
-  --data-binary '{"user":42}'
-
-# Read it: JSON envelope {key,value,ttl}, or ?raw=1 for the value itself
-curl ${API_BASE}/api/kv/session:abc -H "x-api-key: dk_your_key_here"
-curl "${API_BASE}/api/kv/session:abc?raw=1" -H "x-api-key: dk_your_key_here"
-
-# Atomic counter (safe under concurrency); ttl applies when first created
-curl -X POST ${API_BASE}/api/kv/pageviews/incr \\\
-  -H "x-api-key: dk_your_key_here" \\\
-  -H "Content-Type: application/json" \\\
-  -d '{"by":1}'
-
-# List keys (prefix), then flush the project's cache
-curl "${API_BASE}/api/kv?prefix=session" -H "x-api-key: dk_your_key_here"
-curl -X POST ${API_BASE}/api/kv/flush -H "x-api-key: dk_your_key_here"`}</CodeBlock>
 
           <h3>Cron jobs</h3>
           <CodeBlock>{`# List jobs (Bearer auth, account-level)

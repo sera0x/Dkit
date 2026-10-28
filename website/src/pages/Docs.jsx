@@ -99,11 +99,9 @@ export default function Docs({ onNavigate }) {
             <li>Create an account at <a href="/signup" onClick={(e) => { e.preventDefault(); go('/signup'); }}>sign up</a>.</li>
             <li>Verify your email with the 6-digit code we send you.</li>
             <li>Create a project on the dashboard and copy its <code>dk_...</code> API key.</li>
-            <li>Install the CLI, with npm or the release script (no npm needed):</li>
+            <li>Install the CLI (checksum-verified, no npm required):</li>
           </ol>
-          <CodeBlock>{`npm i -g dkit-cli
-# or, same CLI from the GitHub release (checksum verified):
-curl -fsSL https://raw.githubusercontent.com/sera0x/Dkit/main/install.sh | sh`}</CodeBlock>
+          <CodeBlock>{`curl -fsSL https://dkit.name.ng/install.sh | sh`}</CodeBlock>
           <ol start={5}>
             <li>Log in and start setting secrets:</li>
           </ol>
@@ -124,6 +122,7 @@ dkit logs:ship "it's alive"`}</CodeBlock>
             <li><code>Logs</code>: a log drain your apps ship to over HTTP; tail it from the CLI or dashboard. 7-day retention.</li>
             <li><code>Store</code>: a JSON key-value store for app data (counters, sessions, anything small).</li>
             <li><code>API key</code>: the <code>dk_...</code> key that authenticates project calls from your code. The dashboard itself uses your login session; keys are hashed at rest and shown once.</li>
+            <li><code>Encryption</code>: env values and env history are AES-256-GCM encrypted at rest with <code>DKIT_ENCRYPTION_KEY</code>. Rotating or losing that key makes stored values unreadable unless you re-encrypt them first.</li>
           </ul>
         </div>
 

@@ -20,17 +20,17 @@
 Dkit is the boring-infrastructure layer for side projects: secrets per environment, scheduled HTTP jobs, URL monitors that email you once when they go down, a place for apps to ship logs, and a small JSON store. The `dkit` CLI, the React dashboard, and the plain HTTP API all talk to the same backend.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sera0x/Dkit/main/install.sh | sh
+curl -fsSL https://dkit.name.ng/install.sh | sh
 ```
 
-Checksum-verified download, needs only curl, tar and node. If Node is already in your stack: `npm install -g dkit-cli`.
+Checksum-verified download, needs only curl, tar and node. The CLI talks to `https://dkit.name.ng` by default; set `DKIT_API_URL` to point it at a self-hosted API.
 
 ## Self-host it
 
 ```bash
 git clone https://github.com/sera0x/Dkit.git
 cd Dkit
-cp backend/.env.example backend/.env   # fill in the three required values
+cp backend/.env.example backend/.env   # fill in the four required values
 (cd backend && npm install)
 (cd website && npm install && npm run build)
 (cd backend && node src/server.js)
@@ -42,15 +42,16 @@ That brings up the API and the dashboard on `localhost:3001`. The schema creates
 |---|---|
 | `DB_PASSWORD` | Password for the `dkituser` Postgres role |
 | `JWT_SECRET` | Signs session tokens — `openssl rand -hex 32` |
+| `DKIT_ENCRYPTION_KEY` | Encrypts env values, env history and TOTP secrets — `openssl rand -hex 32` |
 | `RESEND_API_KEY` | Sends verification codes, invites and uptime alerts |
 
-OAuth (Google, GitHub) stays hidden until both ID and secret are set. Media uploads need Cloudflare R2 credentials (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`); everything else works without them. A VPS checklist is in [VPS-SETUP.md](VPS-SETUP.md); moving the whole stack to a new box is one archive — see [MIGRATION.md](MIGRATION.md).
+OAuth (Google, GitHub) stays hidden until both ID and secret are set. Media uploads need Cloudflare R2 credentials (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`); everything else works without them. Back up Postgres and `DKIT_ENCRYPTION_KEY` together: without both, stored secrets cannot be recovered.
 
 Set `PUBLIC_URL` in `backend/.env` to your public origin, and build the dashboard with `VITE_SITE_URL` set to the same origin, so OAuth callbacks, invite links and canonical URLs agree. Without `VITE_SITE_URL` the dashboard uses the origin it is served from. A minimal Cloudflare Tunnel ingress is in [`deploy/cloudflared/config.example.yml`](deploy/cloudflared/config.example.yml).
 
 ## What's in it
 
-- **Secrets are hashed at rest.** API keys and refresh tokens are SHA-256 hashes; the plaintext exists only in the response that issued them. Env listings are masked server-side; `env:get` reveals one value, and env history keeps lengths instead of values.
+- **Secrets are encrypted at rest.** Env values, env history and TOTP secrets are AES-256-GCM encrypted with `DKIT_ENCRYPTION_KEY`. API keys and refresh tokens are SHA-256 hashes; the plaintext exists only in the response that issued them. Env listings are masked server-side; `env:get` reveals one value, and the history API returns value lengths instead of values.
 - **Environments are first-class.** `development`, `staging`, `production`, or your own names — separate secret sets per project. `env:diff`, `env:copy`, `env:rollback <key>`.
 - **No `.env` on disk.** `dkit run -- npm start` injects secrets into the child process and exits with its status. `env:pull > .env` exists when you do want the file.
 - **Cron is human strings.** `30s`, `5m`, `daily 09:30`, `mon 09:00`, all UTC, 10-second floor. The API fires the HTTP calls, keeps run history, and can pause or run a job on demand.
@@ -85,10 +86,8 @@ flowchart LR
 | `backend/` | Express API, job runner, auth flow — the entire backend |
 | `website/` | React dashboard and marketing site, built with Vite |
 | `cli/` | The `dkit` CLI, plus project templates for `dkit new` |
-| `scripts/` | Start, update, preview and VPS migration scripts |
+| `scripts/` | Development and test helpers |
 | `install.sh` | The `curl \| sh` installer for the CLI |
-| `VPS-SETUP.md` | Step-by-step VPS setup checklist |
-| `MIGRATION.md` | How to move everything to a new VPS with one archive |
 
 ## CLI
 
@@ -116,8 +115,8 @@ Full reference lives at `/docs` on your deployment.
 
 ## Security, briefly
 
-API keys and refresh tokens are stored as SHA-256 hashes; refresh tokens rotate on every use. Env listings are masked server-side, env history keeps value lengths, and one-time codes and invitations are rate-limited.
+Env values, env history and TOTP secrets are AES-256-GCM encrypted at rest with `DKIT_ENCRYPTION_KEY`. API keys and refresh tokens are stored as SHA-256 hashes; refresh tokens rotate on every use. Env listings are masked server-side, the history API returns value lengths, and one-time codes and invitations are rate-limited.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Security issues: see [SECURITY.md](SECURITY.md).

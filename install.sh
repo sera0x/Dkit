@@ -22,7 +22,7 @@ if [ -z "$version" ]; then
   echo "dkit: looking up the latest release..."
   tag=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
     | grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
-  [ -n "$tag" ] || fail "couldn't determine the latest release; pass a version explicitly, e.g. install.sh v0.1.0"
+  [ -n "$tag" ] || fail "couldn't determine the latest release; pass a version explicitly, e.g. install.sh v0.3.0"
 else
   case "$version" in
     v*) tag="$version" ;;

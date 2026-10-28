@@ -42,6 +42,7 @@ skills-lock.json
 /MIGRATION.md
 /CHANGES.md
 /VPS-SETUP.md
+/VPS-SETUP-BUN.md
 /scripts/migrate-export.sh
 /scripts/migrate-bootstrap.sh
 /scripts/update.sh

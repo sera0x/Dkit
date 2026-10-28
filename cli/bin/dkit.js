@@ -10,7 +10,7 @@ const path = require('path')
 const { scaffold } = require('../lib/scaffold')
 const { deriveNames, validateNpmName } = require('../lib/names')
 const CONFIG_PATH = path.join(os.homedir(), '.dkitrc')
-const API_BASE = process.env.DKIT_API_URL || 'http://localhost:3001'
+const API_BASE = process.env.DKIT_API_URL || 'https://dkit.name.ng'
 function loadConfig() { try { const raw = fs.readFileSync(CONFIG_PATH, 'utf8'); return JSON.parse(raw) } catch { return {} } }
 function saveConfig(config) { fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), { mode: 0o600 }); try { fs.chmodSync(CONFIG_PATH, 0o600) } catch {} }
 function getApiClient(apiKey) { return axios.create({ baseURL: API_BASE, headers: { 'x-api-key': apiKey, 'x-dkit-actor': loadConfig().user?.email || '' } }) }

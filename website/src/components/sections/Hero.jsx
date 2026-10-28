@@ -6,7 +6,7 @@ import Shuffle from '../ui/Shuffle';
 import { useAuth } from '../../context/AuthContext';
 import { MarketingThemeContext } from '../app/MarketingShell';
 import './sections.css';
-const INSTALL_CMD = 'npm i -g dkit-cli';
+const INSTALL_CMD = 'curl -fsSL https://dkit.name.ng/install.sh | sh';
 const Hero = ({ onNavigate }) => {
 const { user } = useAuth();
 const theme = React.useContext(MarketingThemeContext);

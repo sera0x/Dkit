@@ -2,6 +2,7 @@ require('dotenv').config()
 const { Pool } = require('pg')
 const redis = require('redis')
 const crypto = require('crypto')
+const { encryptSecret, decryptSecret, isEncrypted } = require('./secrets')
 const required = ['DB_PASSWORD']
 const missing = required.filter(key => !process.env[key])
 if (missing.length > 0) {
@@ -270,8 +271,49 @@ async function migrateProjectKeys() {
   }
 }
 
+async function encryptExistingSecrets() {
+  let envChanged = 0
+  let historyChanged = 0
+  let totpChanged = 0
+
+  const envRows = await pool.query('SELECT id, value FROM env_vars')
+  for (const row of envRows.rows) {
+    if (isEncrypted(row.value)) {
+      decryptSecret(row.value)
+      continue
+    }
+    await pool.query('UPDATE env_vars SET value = $2 WHERE id = $1', [row.id, encryptSecret(row.value)])
+    envChanged++
+  }
+
+  const historyRows = await pool.query('SELECT id, old_value FROM env_history')
+  for (const row of historyRows.rows) {
+    if (isEncrypted(row.old_value)) {
+      decryptSecret(row.old_value)
+      continue
+    }
+    await pool.query('UPDATE env_history SET old_value = $2 WHERE id = $1', [row.id, encryptSecret(row.old_value)])
+    historyChanged++
+  }
+
+  const totpRows = await pool.query('SELECT id, totp_secret FROM users WHERE totp_secret IS NOT NULL')
+  for (const row of totpRows.rows) {
+    if (isEncrypted(row.totp_secret)) {
+      decryptSecret(row.totp_secret)
+      continue
+    }
+    await pool.query('UPDATE users SET totp_secret = $2 WHERE id = $1', [row.id, encryptSecret(row.totp_secret)])
+    totpChanged++
+  }
+
+  if (envChanged || historyChanged || totpChanged) {
+    console.log(`Encrypted ${envChanged} environment value(s), ${historyChanged} history value(s), ${totpChanged} TOTP secret(s)`)
+  }
+}
+
 const initPromise = (async () => {
   await initDB()
+  await encryptExistingSecrets()
   await migrateProjectKeys()
 })()
 

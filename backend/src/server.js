@@ -11,6 +11,7 @@ const status = require('./status')
 const { isTeamMember, isTeamWriteable, projectAccessFor, sharedTeamIdsForProject, listSharedProjects } = require('./teamAccess')
 const r2 = require('./r2')
 const { generateSecret, verifyTotp, otpauthUrl } = require('./totp')
+const { encryptSecret, decryptSecret } = require('./secrets')
 const crypto = require('crypto')
 const app = express()
 async function loadSelfSettings() {
@@ -18,7 +19,7 @@ async function loadSelfSettings() {
   let applied = 0
   for (const { key, value } of r.rows) {
     if (key.startsWith('PRIVATE_') || process.env[key] !== undefined) continue
-    process.env[key] = value
+    process.env[key] = decryptSecret(value)
     applied++
   }
   if (applied > 0) console.log('Loaded ' + applied + ' setting(s) from the dkit-self project')
@@ -37,7 +38,7 @@ async function ensureSelfProject() {
   if (publicUrl) {
     const seeded = await pool.query(
       `INSERT INTO env_vars (project_id, key, value, environment) VALUES ($1, 'PUBLIC_URL', $2, 'production') ON CONFLICT (project_id, key, environment) DO NOTHING`,
-      [p.rows[0].id, publicUrl]
+      [p.rows[0].id, encryptSecret(publicUrl)]
     )
     if (seeded.rowCount > 0) console.log('Seeded PUBLIC_URL into dkit-self')
   }
@@ -96,8 +97,9 @@ d8              .d888888
 88              d88888888
 8888888888888888888888888
 `
-  res.json({ status: 'ok', service: 'Dkit API', version: '0.1.0', ascii })})
+  res.json({ status: 'ok', service: 'Dkit API', version: '0.3.0', ascii })})
 app.get('/health', (req, res) => { res.redirect(302, '/api/health?force=true') })
+app.get('/install.sh', (req, res) => { res.type('text/x-shellscript').sendFile(path.join(__dirname, '../../install.sh')) })
 
 app.get('/api/status', async (req, res) => {
   try { res.json(await status.listPublic()) }
@@ -191,7 +193,7 @@ if (challenge.rows.length > 0) {
   if (u.rows.length === 0) return res.status(400).json({ error: 'Invalid or expired code' })
   if (u.rows[0].suspended) return res.status(403).json({ error: 'Account suspended', code: 'suspended' })
   const t = String(code || '').replace(/\s/g, '')
-  let ok = verifyTotp(u.rows[0].totp_secret, t)
+  let ok = verifyTotp(decryptSecret(u.rows[0].totp_secret), t)
   if (!ok && /^\d{6}$/.test(t) === false && /^[0-9a-f]{10}$/i.test(t)) {
     const h = crypto.createHash('sha256').update(t.toLowerCase()).digest('hex')
     const rc = await pool.query('DELETE FROM recovery_codes WHERE user_id = $1 AND code_hash = $2 AND used_at IS NULL RETURNING id', [uid, h])
@@ -250,7 +252,7 @@ app.post('/api/auth/2fa/setup', loginLimiter, authenticate, async (req, res) => 
   const cur = await pool.query('SELECT totp_enabled FROM users WHERE id = $1', [req.user.id])
   if (cur.rows[0]?.totp_enabled) return res.status(409).json({ error: 'Two-factor is already enabled' })
   const secret = generateSecret()
-  await pool.query('UPDATE users SET totp_secret = $2, totp_enabled = FALSE WHERE id = $1', [req.user.id, secret])
+  await pool.query('UPDATE users SET totp_secret = $2, totp_enabled = FALSE WHERE id = $1', [req.user.id, encryptSecret(secret)])
   res.json({ secret, otpauth_url: otpauthUrl(req.user.email, secret) })
 })
 
@@ -259,7 +261,7 @@ app.post('/api/auth/2fa/enable', loginLimiter, authenticate, async (req, res) =>
   const u = await pool.query('SELECT email, totp_secret, totp_enabled FROM users WHERE id = $1', [req.user.id])
   if (!u.rows[0]?.totp_secret) return res.status(400).json({ error: 'Start the setup first' })
   if (u.rows[0].totp_enabled) return res.status(409).json({ error: 'Two-factor is already enabled' })
-  if (!verifyTotp(u.rows[0].totp_secret, code)) return res.status(400).json({ error: 'That code did not match. Wait for the next code and try again.' })
+  if (!verifyTotp(decryptSecret(u.rows[0].totp_secret), code)) return res.status(400).json({ error: 'That code did not match. Wait for the next code and try again.' })
   await pool.query('UPDATE users SET totp_enabled = TRUE WHERE id = $1', [req.user.id])
   const codes = Array.from({ length: 8 }, () => crypto.randomBytes(5).toString('hex'))
   await pool.query('DELETE FROM recovery_codes WHERE user_id = $1', [req.user.id])
@@ -275,7 +277,7 @@ app.post('/api/auth/2fa/disable', loginLimiter, authenticate, async (req, res) =
   if (!u.rows[0]?.totp_enabled) return res.status(400).json({ error: 'Two-factor is not enabled' })
   const pwOk = u.rows[0].password_hash ? await verifyPassword(String(password || ''), u.rows[0].password_hash) : true
   if (!pwOk) return res.status(401).json({ error: 'Wrong password' })
-  if (!verifyTotp(u.rows[0].totp_secret, code)) return res.status(400).json({ error: 'Invalid or expired code' })
+  if (!verifyTotp(decryptSecret(u.rows[0].totp_secret), code)) return res.status(400).json({ error: 'Invalid or expired code' })
   await pool.query('UPDATE users SET totp_enabled = FALSE, totp_secret = NULL WHERE id = $1', [req.user.id])
   await pool.query('DELETE FROM recovery_codes WHERE user_id = $1', [req.user.id])
   res.json({ enabled: false, message: 'Two-factor disabled' })
@@ -820,14 +822,15 @@ const masked = (v) => '•'.repeat(Math.max(4, Math.min(String(v).length, 16)))
 if (environment) {
 const result = await pool.query('SELECT key, value FROM env_vars WHERE project_id = $1 AND environment = $2', [req.project.id, environment])
 const env = {}
-result.rows.forEach(row => { env[row.key] = mask ? masked(row.value) : row.value })
+result.rows.forEach(row => { const plain = decryptSecret(row.value); env[row.key] = mask ? masked(plain) : plain })
 return res.json({ env, count: Object.keys(env).length, environment })
 }
 const result = await pool.query('SELECT key, value, environment FROM env_vars WHERE project_id = $1', [req.project.id])
 const env = {}
 result.rows.forEach(row => {
 const key = row.environment === 'production' ? row.key : row.key + '__' + row.environment
-env[key] = mask ? masked(row.value) : row.value
+const plain = decryptSecret(row.value)
+env[key] = mask ? masked(plain) : plain
 })
 res.json({ env, count: Object.keys(env).length })
 })
@@ -836,15 +839,15 @@ const { key } = req.params
 const { environment = 'production' } = req.query
 const result = await pool.query('SELECT value FROM env_vars WHERE project_id = $1 AND key = $2 AND environment = $3', [req.project.id, key, environment])
 if (result.rows.length === 0) return res.status(404).json({ error: 'Environment variable not found' })
-res.json({ key, value: result.rows[0].value, environment })
+res.json({ key, value: decryptSecret(result.rows[0].value), environment })
 })
 app.post('/api/env', projectLimiter, authenticateProject, async (req, res) => {
 const { key, value, environment = 'production' } = req.body
 if (!key || value === undefined) return res.status(400).json({ error: 'Key and value required' })
 const existing = await pool.query('SELECT value FROM env_vars WHERE project_id = $1 AND key = $2 AND environment = $3', [req.project.id, key, environment])
 await pool.query('INSERT INTO env_history (project_id, key, environment, old_value, action, actor, actor_ip) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-[req.project.id, key, environment, existing.rows[0]?.value || '', existing.rows.length > 0 ? 'update' : 'set', String(req.headers['x-dkit-actor'] || '').slice(0, 120) || null, clientIp(req)])
-await pool.query(`INSERT INTO env_vars (project_id, key, value, environment) VALUES ($1, $2, $3, $4) ON CONFLICT (project_id, key, environment) DO UPDATE SET value = $3`, [req.project.id, key, value, environment])
+[req.project.id, key, environment, encryptSecret(existing.rows[0]?.value || ''), existing.rows.length > 0 ? 'update' : 'set', String(req.headers['x-dkit-actor'] || '').slice(0, 120) || null, clientIp(req)])
+await pool.query(`INSERT INTO env_vars (project_id, key, value, environment) VALUES ($1, $2, $3, $4) ON CONFLICT (project_id, key, environment) DO UPDATE SET value = $3`, [req.project.id, key, encryptSecret(value), environment])
 res.json({ success: true, message: 'Environment variable saved' })
 })
 
@@ -861,8 +864,8 @@ app.post('/api/env/import', projectLimiter, authenticateProject, async (req, res
       const value = String(vars[i].value ?? '')
       const existing = await client.query('SELECT value FROM env_vars WHERE project_id = $1 AND key = $2 AND environment = $3', [req.project.id, keys[i], environment])
       await client.query('INSERT INTO env_history (project_id, key, environment, old_value, action, actor, actor_ip) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [req.project.id, keys[i], environment, existing.rows[0]?.value || '', existing.rows.length > 0 ? 'update' : 'set', String(req.headers['x-dkit-actor'] || '').slice(0, 120) || null, clientIp(req)])
-      await client.query(`INSERT INTO env_vars (project_id, key, value, environment) VALUES ($1, $2, $3, $4) ON CONFLICT (project_id, key, environment) DO UPDATE SET value = $3`, [req.project.id, keys[i], value, environment])
+        [req.project.id, keys[i], environment, encryptSecret(existing.rows[0]?.value || ''), existing.rows.length > 0 ? 'update' : 'set', String(req.headers['x-dkit-actor'] || '').slice(0, 120) || null, clientIp(req)])
+      await client.query(`INSERT INTO env_vars (project_id, key, value, environment) VALUES ($1, $2, $3, $4) ON CONFLICT (project_id, key, environment) DO UPDATE SET value = $3`, [req.project.id, keys[i], encryptSecret(value), environment])
     }
     await client.query('COMMIT')
     res.json({ success: true, imported: vars.length })
@@ -885,11 +888,11 @@ const { key, environment = 'production' } = req.body
 if (!key) return res.status(400).json({ error: 'Key required' })
 const history = await pool.query('SELECT old_value FROM env_history WHERE project_id = $1 AND key = $2 AND environment = $3 ORDER BY created_at DESC LIMIT 1', [req.project.id, key, environment])
 if (history.rows.length === 0) return res.status(404).json({ error: 'No history to rollback to' })
-const oldValue = history.rows[0].old_value
+const oldValue = decryptSecret(history.rows[0].old_value)
 const current = await pool.query('SELECT value FROM env_vars WHERE project_id = $1 AND key = $2 AND environment = $3', [req.project.id, key, environment])
 await pool.query('INSERT INTO env_history (project_id, key, environment, old_value, action, actor, actor_ip) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-[req.project.id, key, environment, current.rows[0]?.value || '', 'rollback', String(req.headers['x-dkit-actor'] || '').slice(0, 120) || null, clientIp(req)])
-await pool.query(`INSERT INTO env_vars (project_id, key, value, environment) VALUES ($1, $2, $3, $4) ON CONFLICT (project_id, key, environment) DO UPDATE SET value = $3`, [req.project.id, key, oldValue, environment])
+[req.project.id, key, environment, encryptSecret(current.rows[0]?.value || ''), 'rollback', String(req.headers['x-dkit-actor'] || '').slice(0, 120) || null, clientIp(req)])
+await pool.query(`INSERT INTO env_vars (project_id, key, value, environment) VALUES ($1, $2, $3, $4) ON CONFLICT (project_id, key, environment) DO UPDATE SET value = $3`, [req.project.id, key, encryptSecret(oldValue), environment])
 res.json({ success: true, message: `Rolled back ${key} to previous value` })
 })
 app.delete('/api/env/:key', projectLimiter, authenticateProject, async (req, res) => {
@@ -898,7 +901,7 @@ const { environment = 'production' } = req.query
 const deleted = await pool.query('DELETE FROM env_vars WHERE project_id = $1 AND key = $2 AND environment = $3 RETURNING value', [req.project.id, key, environment])
 if (deleted.rows.length > 0) {
 await pool.query('INSERT INTO env_history (project_id, key, environment, old_value, action, actor, actor_ip) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-[req.project.id, key, environment, deleted.rows[0].value, 'delete', String(req.headers['x-dkit-actor'] || '').slice(0, 120) || null, clientIp(req)])
+[req.project.id, key, environment, encryptSecret(deleted.rows[0].value), 'delete', String(req.headers['x-dkit-actor'] || '').slice(0, 120) || null, clientIp(req)])
 }
 res.json({ success: true, message: 'Environment variable deleted' })
 })
@@ -906,12 +909,12 @@ res.json({ success: true, message: 'Environment variable deleted' })
 app.get('/api/env/:key/history', projectLimiter, authenticateProject, async (req, res) => {
 const { environment = 'production' } = req.query
 const r = await pool.query(
-`SELECT action, actor, actor_ip, LENGTH(old_value) AS old_length, created_at
+`SELECT action, actor, actor_ip, old_value, created_at
  FROM env_history WHERE project_id = $1 AND key = $2 AND environment = $3
  ORDER BY created_at DESC LIMIT 100`,
 [req.project.id, req.params.key, environment]
 )
-res.json({ events: r.rows })
+res.json({ events: r.rows.map(({ old_value, ...row }) => ({ ...row, old_length: decryptSecret(old_value).length })) })
 })
 app.get('/api/store/:key', projectLimiter, authenticateProject, async (req, res) => {
 const { key } = req.params

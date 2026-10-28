@@ -5,16 +5,10 @@ The `dkit` command for [Dkit](https://github.com/sera0x/Dkit) — secrets, scaff
 ## Install
 
 ```bash
-npm install -g dkit-cli
+curl -fsSL https://dkit.name.ng/install.sh | sh
 ```
 
-No install script in this package: everything is plain JavaScript, so `npm ci --ignore-scripts` and pnpm's defaults work fine.
-
-Prefer not to use npm? The same CLI ships as a tarball with every GitHub release, with an installer that verifies the checksum first:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/sera0x/Dkit/main/install.sh | sh
-```
+The installer downloads the latest release tarball, verifies its checksum, and installs the CLI without npm.
 
 ## Quickstart
 
@@ -29,7 +23,7 @@ dkit env:set DATABASE_URL postgres://...
 
 ## Configuration
 
-The CLI talks to `http://localhost:3001` by default. Point it at your server:
+The CLI talks to `https://dkit.name.ng` by default. Point it at a self-hosted server:
 
 ```bash
 export DKIT_API_URL=https://your-server

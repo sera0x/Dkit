@@ -11,12 +11,8 @@ const NAV_LINKS = [
   { path: '/tools', label: 'Tools' },
 ];
 
-// No "dkit login" while someone is already mid-login/signup — the page itself
-// is the auth form.
 const AUTH_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password'];
 
-// The close animation runs at var(--duration-quick) = 150ms; unmount a beat
-// later so the exit is never clipped.
 const CLOSE_MS = 170;
 
 const Navbar = ({ onNavigate, currentPath }) => {
@@ -27,8 +23,6 @@ const Navbar = ({ onNavigate, currentPath }) => {
   const { user } = useAuth();
   const onAuthPage = AUTH_PATHS.includes((currentPath || '').split(/[?#]/)[0]);
 
-  // Close = animate out first, unmount after. Reopening mid-close cancels the
-  // timer and remounts (new key) so the open animation plays again.
   const closeDrawer = () => {
     if (closeTimer.current) return;
     setClosing(true);
@@ -59,7 +53,6 @@ const Navbar = ({ onNavigate, currentPath }) => {
     };
   }, [open]);
 
-  // Don't leave a pending unmount timer behind if the navbar unmounts mid-close.
   useEffect(() => () => clearTimeout(closeTimer.current), []);
 
   const go = (path) => { closeDrawer(); onNavigate ? onNavigate(path) : (window.location.href = path); };

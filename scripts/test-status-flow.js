@@ -1,8 +1,3 @@
-// One-off end-to-end test of the status incident flow against the live DB.
-// Run: cd backend && node ../scripts/test-status-flow.js
-// Drives backend/src/status.js directly (same functions the API routes call):
-// dead URL → probes flip Docs down → auto incident + unseen notification + email
-// → restore URL → probes flip it up → auto-resolve. Then mode is left as found.
 process.env.NODE_ENV = process.env.NODE_ENV || 'development'
 const { pool } = require('../backend/src/db')
 const status = require('../backend/src/status')
@@ -16,7 +11,6 @@ async function main() {
   log('service:', svc)
 
   try {
-    // 1. Break it: point the probe at a dead port.
     const deadUrl = 'http://127.0.0.1:9/test-down'
     await pool.query('UPDATE status_services SET url = $2, consecutive_failures = 0, status = CASE WHEN mode = $2 THEN status ELSE status END WHERE id = $1', [svc.id, deadUrl])
     console.log('\n--- probe 1 (first failure: should stay up, record failure) ---')
@@ -41,7 +35,6 @@ async function main() {
     await status.ackNotifications()
     log('unseen after ack:', (await status.listAdmin()).unseen_count)
 
-    // 2. Heal it.
     console.log('\n--- restore + probe (should flip up + auto-resolve) ---')
     await pool.query('UPDATE status_services SET url = $2 WHERE id = $1', [svc.id, originalUrl])
     const afterUp = await status.probeService({ ...svc, url: originalUrl, status: 'down', consecutive_failures: 2 }, { force: true })
@@ -54,7 +47,6 @@ async function main() {
     const inc = pub2.incidents.find((i) => i.title.includes('Docs'))
     log('docs incident:', inc && { state: inc.state, resolved_at: inc.resolved_at, last_update: inc.updates[inc.updates.length - 1] })
 
-    // 3. Maintenance mode round-trip.
     console.log('\n--- maintenance mode round-trip ---')
     await status.setServiceMode(svc.id, 'manual_down')
     const pub3 = await status.listPublic()
@@ -65,7 +57,6 @@ async function main() {
 
     console.log('\nALL CHECKS PASSED (check pm2 logs for the two DOWN/UP emails to the admin address)')
   } finally {
-    // Leave the service exactly as found.
     await pool.query('UPDATE status_services SET url = $2, mode = $3 WHERE id = $1', [svc.id, originalUrl, svc.mode]).catch(() => {})
     await pool.end()
   }

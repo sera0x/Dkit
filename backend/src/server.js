@@ -13,13 +13,6 @@ const r2 = require('./r2')
 const { generateSecret, verifyTotp, otpauthUrl } = require('./totp')
 const crypto = require('crypto')
 const app = express()
-// ---------------------------------------------------------------------------
-// Self-hosting bootstrap: any env var NOT set in the environment is read from
-// the special 'dkit-self' project (a normal Dkit project). dkit.name.ng runs
-// its own config through its own product.
-// Environment still wins, so ops can always override without touching the DB.
-// Never load private keys here: those go in backend/.env only.
-// ---------------------------------------------------------------------------
 async function loadSelfSettings() {
   const r = await pool.query(`SELECT key, value FROM env_vars ev JOIN projects p ON p.id = ev.project_id WHERE p.name = 'dkit-self'`)
   let applied = 0
@@ -31,9 +24,6 @@ async function loadSelfSettings() {
   if (applied > 0) console.log('Loaded ' + applied + ' setting(s) from the dkit-self project')
 }
 
-// First admin to boot claims the dkit-self project (created if missing) and
-// seeds PUBLIC_URL into it from the environment, so the dogfood loop starts
-// itself. Later boots keep DB values that differ from env — seed only fills gaps.
 async function ensureSelfProject() {
   let p = await pool.query('SELECT id FROM projects WHERE name = \'dkit-self\'')
   if (p.rows.length === 0) {
@@ -59,14 +49,6 @@ app.use(express.json())
 const PORT = process.env.PORT || 3001
 const clientIp = (req) => req.headers['cf-connecting-ip'] || req.ip || req.socket.remoteAddress || ''
 
-// ---------------------------------------------------------------------------
-// Sessions: short-lived JWT access token + long-lived opaque refresh token.
-// Every login (password, OAuth) gets both; clients silently POST /api/auth/
-// refresh when the access token expires instead of making the user re-login.
-// Refresh tokens rotate on every use (the old row is revoked, a fresh token is
-// issued), so a stolen token stops working the moment the real client next
-// refreshes. Tokens are hashed at rest; plaintext lives only with the client.
-// ---------------------------------------------------------------------------
 async function issueSession(userId, req) {
   const token = generateToken(userId)
   const refreshToken = newRefreshToken()
@@ -76,28 +58,16 @@ async function issueSession(userId, req) {
   )
   return { token, refresh_token: refreshToken }
 }
-// Cache reads are meant to be frequent (an app may hit /api/kv hundreds of
-// times a minute), so /api/kv skips the 300-per-15-minutes human limiter and
-// gets its own per-key budget instead.
 const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false, skip: (req) => req.originalUrl.startsWith('/api/kv'), message: { error: 'Too many requests. Please slow down.' } })
 app.use('/api/', globalLimiter)
 const projectLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false, keyGenerator: (req) => req.headers['x-api-key'] || req.ip, message: { error: 'Too many requests for this API key. Please slow down.' } })
 const kvLimiter = rateLimit({ windowMs: 60 * 1000, max: Number(process.env.KV_RATE_LIMIT) || 1200, standardHeaders: true, legacyHeaders: false, keyGenerator: (req) => req.headers['x-api-key'] || req.ip, message: { error: 'Cache rate limit exceeded. Raise KV_RATE_LIMIT if this is a real workload.' } })
-// Cache values are small on purpose: 128 KB by default, hard-capped by
-// KV_MAX_BYTES. Keys are URL/SCAN-safe (no spaces, slashes or glob chars), so
-// a prefix listing can never smuggle a wildcard into the Redis MATCH pattern.
 const KV_MAX_BYTES = Number(process.env.KV_MAX_BYTES) || 128 * 1024
 const KV_MAX_TTL = 30 * 24 * 60 * 60
 const KV_KEY_RE = /^[A-Za-z0-9._:-]{1,128}$/
-// Failed password / code / token attempts only (successful requests are NOT counted).
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 15, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many failed attempts. Please wait a few minutes and try again.' } })
-// Anything that actually sends an email (only successful sends count), keyed per IP + target email.
 const emailLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 6, skipFailedRequests: true, standardHeaders: true, legacyHeaders: false, keyGenerator: (req) => req.ip + '|' + String(req.body?.email || '').toLowerCase(), message: { error: 'Too many emails requested. Please wait a few minutes and try again.' } })
-// OAuth is a browser redirect flow: send people back to /login instead of showing raw JSON.
 const oauthLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 40, standardHeaders: true, legacyHeaders: false, handler: (req, res) => res.redirect((process.env.PUBLIC_URL || '') + '/login?error=rate') })
-// Team constants + limiters live up here because team routes reference the
-// limiters as middleware — which is evaluated when routes REGISTER, so the
-// consts must exist by then (declaring them further down crashes on boot).
 const TEAM_ROLES = ['admin', 'member']
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -127,20 +97,13 @@ d8              .d888888
 8888888888888888888888888
 `
   res.json({ status: 'ok', service: 'Dkit API', version: '0.1.0', ascii })})
-// Friendly alias: /health would otherwise fall through to the SPA; point it at the real endpoint.
 app.get('/health', (req, res) => { res.redirect(302, '/api/health?force=true') })
 
-// ---------------------------------------------------------------------------
-// Public status page (GET /api/status — the website /status page reads this).
-// No auth: anyone can see which Dkit services are up. The prober lives in
-// status.js; admins control per-service up/down and incidents via /api/admin/*.
-// ---------------------------------------------------------------------------
 app.get('/api/status', async (req, res) => {
   try { res.json(await status.listPublic()) }
   catch (e) { console.error('status error:', e); res.status(500).json({ error: 'status failed' }) }
 })
 
-// --- admin: services + incidents + notification feed (requireAdmin hoists) ---
 app.get('/api/admin/status', authenticate, requireAdmin, async (req, res) => {
   try { res.json(await status.listAdmin()) }
   catch (e) { console.error('admin status error:', e); res.status(500).json({ error: 'failed' }) }
@@ -191,8 +154,6 @@ if (!sent) return res.status(502).json({ error: 'Could not send the verification
 const token = generateToken(result.rows[0].id)
 const refresh_token = (await issueSession(result.rows[0].id, req)).refresh_token
 await pool.query('UPDATE users SET last_ip = $1, last_login_at = NOW() WHERE id = $2', [clientIp(req), result.rows[0].id]).catch(() => {})
-// Welcome mail goes out once, right after signup. Fire-and-forget: the
-// response must not wait on (or fail because of) the second email.
 sendWelcomeEmail(email).catch(() => {})
 res.json({ user: result.rows[0], token, refresh_token, message: 'Welcome to Dkit. Verification code sent to your email.' })
 } catch (err) {
@@ -208,9 +169,6 @@ if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid cred
 const valid = await verifyPassword(password, result.rows[0].password_hash)
 if (!valid) return res.status(401).json({ error: 'Invalid credentials' })
 if (result.rows[0].suspended) return res.status(403).json({ error: 'Account suspended', code: 'suspended' })
-// 2FA accounts skip the email code: the authenticator app IS the second
-// factor. The response shape stays compatible (login_token) so both clients
-// just get one extra step instead of a new flow.
 if (result.rows[0].totp_enabled) {
   const loginToken = crypto.randomBytes(32).toString('hex')
   await pool.query('INSERT INTO login_challenges (login_token, user_id) VALUES ($1, $2)', [loginToken, result.rows[0].id])
@@ -226,11 +184,6 @@ res.json({ login_token: loginToken, message: 'Verification code sent to your ema
 app.post('/api/auth/login/verify', loginLimiter, async (req, res) => {
 const { login_token, code } = req.body
 if (!login_token || !code) return res.status(400).json({ error: 'Login token and code required' })
-// Two-factor challenge: login_token matches a pending challenge and code is
-// an authenticator code or a recovery code. A wrong code keeps the challenge
-// alive so the user can retry inside the 10-minute window (the row is only
-// consumed on success — still one-shot against replay). Brute force stays
-// bounded by loginLimiter and by initiate requiring the real password.
 const challenge = await pool.query('SELECT user_id FROM login_challenges WHERE login_token = $1 AND expires_at > NOW()', [login_token])
 if (challenge.rows.length > 0) {
   const uid = challenge.rows[0].user_id
@@ -286,12 +239,6 @@ const verified = result.rows[0]?.verified || false
 res.json({ verified })
 })
 
-// ---------------------------------------------------------------------------
-// Two-factor auth (TOTP). Enable: generate a secret, confirm with one live
-// code, get recovery codes once. Disable: needs password AND a current code,
-// so a stolen session can't turn 2FA off. Setup state is discarded unless
-// confirmed, so nobody can be locked out mid-setup.
-// ---------------------------------------------------------------------------
 app.get('/api/auth/2fa/status', authenticate, async (req, res) => {
   const r = await pool.query('SELECT totp_enabled FROM users WHERE id = $1', [req.user.id])
   const enabled = !!r.rows[0]?.totp_enabled
@@ -334,9 +281,6 @@ app.post('/api/auth/2fa/disable', loginLimiter, authenticate, async (req, res) =
   res.json({ enabled: false, message: 'Two-factor disabled' })
 })
 
-// API key rotation: a fresh key is generated and returned ONCE; the old key
-// stops working immediately. Forced when the requester isn't the owner
-// (e.g. a team admin rotating a shared project's key).
 app.post('/api/projects/:id/rotate-key', authenticate, async (req, res) => {
   const id = req.params.id
   const own = await pool.query('SELECT id, user_id FROM projects WHERE id = $1', [id])
@@ -360,10 +304,6 @@ app.post('/api/projects/:id/rotate-key', authenticate, async (req, res) => {
   res.json({ ...r.rows[0], api_key: apiKey, message: 'Key rotated. The previous key no longer works.' })
 })
 
-// On-demand API keys: issue a key for a KEYLESS project. Same one-time
-// semantics as rotation — plaintext returned once, hashed at rest. Refuses if
-// a key already exists (rotate to replace, DELETE to remove). Shared projects:
-// owner or team owner/admin, mirroring the rotate gate.
 app.post('/api/projects/:id/api-key', authenticate, async (req, res) => {
   const id = req.params.id
   const own = await pool.query('SELECT id, user_id, key_hash FROM projects WHERE id = $1', [id])
@@ -388,9 +328,6 @@ app.post('/api/projects/:id/api-key', authenticate, async (req, res) => {
   res.json({ ...r.rows[0], api_key: apiKey, message: 'API key created. It is shown once and stored hashed.' })
 })
 
-// Revoke a project's API key entirely: the project becomes keyless until
-// someone creates a new one. Dashboard/session access is unaffected — only
-// CLI / x-api-key clients lose access. Owner or team owner/admin.
 app.delete('/api/projects/:id/api-key', authenticate, async (req, res) => {
   const id = req.params.id
   const own = await pool.query('SELECT id, user_id FROM projects WHERE id = $1', [id])
@@ -409,8 +346,6 @@ app.delete('/api/projects/:id/api-key', authenticate, async (req, res) => {
   res.json({ success: true, message: 'API key revoked. The project is keyless until a new one is created.' })
 })
 
-// Sessions / devices: everything logged in as this user, newest first. The
-// current session is flagged so the UI can protect it from casual revocation.
 app.get('/api/auth/sessions', authenticate, async (req, res) => {
   const currentHash = req.get('x-session-token') ? hashRefreshToken(String(req.get('x-session-token'))) : null
   const r = await pool.query(
@@ -423,8 +358,6 @@ app.get('/api/auth/sessions', authenticate, async (req, res) => {
   res.json(r.rows)
 })
 
-// Revoke one device session. Revoking your own (current) session also works —
-// it logs that device out on its next refresh.
 app.delete('/api/auth/sessions/:id', authenticate, async (req, res) => {
   if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Session not found' })
   const r = await pool.query('DELETE FROM sessions WHERE id = $1 AND user_id = $2 RETURNING id', [req.params.id, req.user.id])
@@ -432,7 +365,6 @@ app.delete('/api/auth/sessions/:id', authenticate, async (req, res) => {
   res.json({ ok: true })
 })
 
-// Revoke every other device at once (e.g. after losing a laptop).
 app.post('/api/auth/sessions/revoke-others', authenticate, async (req, res) => {
   const currentHash = req.get('x-session-token') ? hashRefreshToken(String(req.get("x-session-token"))) : null
   if (!currentHash) return res.status(400).json({ error: 'x-session-token header required' })
@@ -443,15 +375,9 @@ app.get('/api/auth/session', authenticate, async (req, res) => {
   const r = await pool.query('SELECT is_admin, suspended FROM users WHERE id = $1', [req.user.id])
   if (r.rows[0]?.suspended) return res.status(403).json({ error: 'Account suspended' })
   pool.query('UPDATE users SET last_ip = $1, last_login_at = NOW() WHERE id = $2', [clientIp(req), req.user.id]).catch(() => {})
-  // Deliberately do NOT expose is_admin here — admin capability is probed
-  // separately via /api/admin/session so a normal session response doesn't
-  // advertise privileged status to anyone inspecting the network tab.
   res.json({ id: req.user.id, email: req.user.email })
 })
 
-// Exchange a valid refresh token for a fresh access token. Rotation: the used
-// token is revoked and a new one issued, so every refresh invalidates the
-// previous token. A revoked/unknown token means the client is logged out.
 app.post('/api/auth/refresh', loginLimiter, async (req, res) => {
   const { refresh_token } = req.body
   if (!refresh_token) return res.status(400).json({ error: 'refresh_token required' })
@@ -471,8 +397,6 @@ app.post('/api/auth/refresh', loginLimiter, async (req, res) => {
   res.json({ token: generateToken(user_id), refresh_token: newToken, user: { id: user_id, email } })
 })
 
-// Revoke a single session (used on logout). The client throws away its tokens
-// either way — this just makes the refresh token useless to anyone else.
 app.post('/api/auth/logout', async (req, res) => {
   const { refresh_token } = req.body || {}
   if (refresh_token) {
@@ -480,10 +404,6 @@ app.post('/api/auth/logout', async (req, res) => {
   }
   res.json({ ok: true })
 })
-// Projects start KEYLESS. An API key is issued on demand via
-// POST /api/projects/:id/api-key — shown once, stored hashed, saved to the
-// requesting browser's vault. Dashboard work never needs the key (it rides
-// the session); the key is only for CLI / HTTP API use from code.
 app.post('/api/projects', authenticate, async (req, res) => {
 const verifyResult = await pool.query('SELECT verified FROM email_verifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [req.user.id])
 if (!verifyResult.rows[0]?.verified) return res.status(403).json({ error: 'Email not verified. Please verify your email first.' })
@@ -496,11 +416,7 @@ const result = await pool.query(
 res.json({ ...result.rows[0], message: 'Project created successfully' })
 })
 app.get('/api/projects', authenticate, async (req, res) => {
-// API keys are hashed at rest, so the full key can't be listed. Clients keep
-// the plaintext from creation/rotation; has_plain_key tells the dashboard
-// whether it still has a pre-hashing key cached.
 const result = await pool.query('SELECT id, user_id, name, key_prefix, key_rotated_at, (api_key IS NOT NULL) AS has_plain_key, created_at FROM projects WHERE user_id = $1', [req.user.id])
-// Projects shared into teams the user belongs to, marked so the UI can show provenance
 const shared = await listSharedProjects(req.user.id)
 res.json({ projects: result.rows, shared_projects: shared })
 })
@@ -511,8 +427,6 @@ if (result.rows.length === 0) return res.status(404).json({ error: 'Project not 
 res.json({ ...result.rows[0], shared_teams: await sharedTeamIdsForProject(id) })
 })
 
-// Project-wide audit feed (newest first). Values are never included — this is
-// a record of who changed what, when, and from where.
 app.get('/api/projects/:id/audit', authenticate, async (req, res) => {
   if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Project not found' })
   if (!(await projectAccessFor(req.params.id, req.user.id))) return res.status(404).json({ error: 'Project not found' })
@@ -527,35 +441,20 @@ app.get('/api/projects/:id/audit', authenticate, async (req, res) => {
 app.delete('/api/projects/:id', authenticate, async (req, res) => {
 const { id } = req.params
 const deleted = await pool.query('DELETE FROM projects WHERE id = $1 AND user_id = $2 RETURNING id', [id, req.user.id])
-// team_projects rows go too (ON DELETE CASCADE). The Redis cache lives outside
-// Postgres, so purge its namespace explicitly — only if we really deleted the
-// project, so nobody can flush a project they don't own by guessing its id.
 if (deleted.rows.length) await clearProjectCache(id).catch(() => {})
 res.json({ success: true, message: 'Project deleted' })
 })
 
-// ---------------------------------------------------------------------------
-// Key vault: the browser never stores API keys (they're hashed at rest), so
-// "reveal" and "copy" only work for keys the user has deliberately saved into
-// localStorage for this browser. verify-key checks a candidate key without
-// us having to know whether it's the real one — SHA-256 match against key_hash.
-// ---------------------------------------------------------------------------
 app.post('/api/projects/:id/verify-key', authenticate, async (req, res) => {
   if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Project not found' })
   const { key } = req.body || {}
   if (!key || typeof key !== 'string') return res.status(400).json({ error: 'key required' })
-  // Team members can verify too — the shared key is how they get into the
-  // project's env/store, so they need to be able to save it in their vault.
   const r = await projectAccessFor(req.params.id, req.user.id)
   if (!r) return res.status(404).json({ error: 'Project not found' })
   const matches = crypto.createHash('sha256').update(key).digest('hex') === r.key_hash
   res.json({ matches, key_prefix: r.key_prefix })
 })
 
-// ===========================================================================
-// CRON JOBS — schedule outbound HTTP calls from the API.
-// Schedules: "5m", "30s", "2h", "daily 09:30", "mon 09:00" (UTC).
-// ===========================================================================
 function validateSchedule(schedule) {
   return typeof jobs.parseSchedule(schedule) === 'number'
 }
@@ -591,7 +490,6 @@ app.post('/api/projects/:id/cron', authenticate, async (req, res) => {
   }
 })
 
-// Run a job immediately ("run now" button). Scheduling is untouched.
 app.post('/api/projects/:id/cron/:jobId/run', authenticate, async (req, res) => {
   if (!UUID_RE.test(req.params.id) || !UUID_RE.test(req.params.jobId)) return res.status(404).json({ error: 'Job not found' })
   if (!(await projectAccessFor(req.params.id, req.user.id))) return res.status(404).json({ error: 'Project not found' })
@@ -608,7 +506,6 @@ app.patch('/api/projects/:id/cron/:jobId', authenticate, async (req, res) => {
   const job = await pool.query('SELECT * FROM cron_jobs WHERE id = $1 AND project_id = $2', [req.params.jobId, req.params.id])
   if (job.rows.length === 0) return res.status(404).json({ error: 'Job not found' })
   const { enabled, url, method, headers, body, schedule } = req.body || {}
-  // Toggling enabled only flips the flag; a fresh schedule re-arms next_run_at.
   const nextRun = schedule !== undefined ? (validateSchedule(schedule) ? jobs.firstRunAt(schedule) : null) : (job.rows[0].next_run_at)
   if (schedule !== undefined && !validateSchedule(schedule)) return res.status(400).json({ error: 'Invalid schedule. Use "5m", "30s", "2h", "daily 09:30", or "mon 09:00" (UTC).' })
   const r = await pool.query(
@@ -650,9 +547,6 @@ app.get('/api/projects/:id/cron/:jobId/runs', authenticate, async (req, res) => 
   res.json({ runs: r.rows })
 })
 
-// ===========================================================================
-// UPTIME MONITORS — the API probes your URLs; email on down/up flips.
-// ===========================================================================
 app.get('/api/projects/:id/monitors', authenticate, async (req, res) => {
   if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Project not found' })
   if (!(await projectAccessFor(req.params.id, req.user.id))) return res.status(404).json({ error: 'Project not found' })
@@ -709,7 +603,6 @@ app.delete('/api/projects/:id/monitors/:monitorId', authenticate, async (req, re
   res.json({ ok: true })
 })
 
-// Check history for a latency chart.
 app.get('/api/projects/:id/monitors/:monitorId/checks', authenticate, async (req, res) => {
   if (!UUID_RE.test(req.params.id) || !UUID_RE.test(req.params.monitorId)) return res.status(404).json({ error: 'Monitor not found' })
   if (!(await projectAccessFor(req.params.id, req.user.id))) return res.status(404).json({ error: 'Project not found' })
@@ -718,12 +611,6 @@ app.get('/api/projects/:id/monitors/:monitorId/checks', authenticate, async (req
   const r = await pool.query('SELECT checked_at, status_code, ok, latency_ms, error FROM monitor_checks WHERE monitor_id = $1 ORDER BY checked_at DESC LIMIT 100', [req.params.monitorId])
   res.json({ checks: r.rows })
 })
-// ===========================================================================
-// LOG DRAIN — ship logs from any app over HTTP; tail from CLI or dashboard.
-// POST /api/projects/:id/logs (Bearer) for the dashboard, or x-api-key from
-// any app. JSON body: { events: [{ level, message, meta, source, ts }] } or
-// a single { level, message, ... }.
-// ===========================================================================
 const LOG_LEVELS = ['debug', 'info', 'warn', 'error']
 const MAX_LOGS_PER_PROJECT = 5000
 
@@ -755,7 +642,6 @@ async function insertLogEvents(projectId, events, fallbackSource) {
   return r.rowCount
 }
 
-// Dashboard (session) ingest.
 app.post('/api/projects/:id/logs', authenticate, async (req, res) => {
   if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Project not found' })
   if (!(await projectAccessFor(req.params.id, req.user.id))) return res.status(404).json({ error: 'Project not found' })
@@ -766,7 +652,6 @@ app.post('/api/projects/:id/logs', authenticate, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Could not store log events' }) }
 })
 
-// API-key ingest — this is the one apps actually call.
 app.post('/api/logs', projectLimiter, authenticateProject, async (req, res) => {
   const events = Array.isArray(req.body?.events) ? req.body.events.slice(0, 100) : [req.body || {}]
   try {
@@ -775,7 +660,6 @@ app.post('/api/logs', projectLimiter, authenticateProject, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Could not store log events' }) }
 })
 
-// Query: level filter, search substring, cursor pagination (newest first).
 app.get('/api/projects/:id/logs', authenticate, async (req, res) => {
   if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Project not found' })
   if (!(await projectAccessFor(req.params.id, req.user.id))) return res.status(404).json({ error: 'Project not found' })
@@ -802,22 +686,9 @@ app.delete('/api/projects/:id/logs', authenticate, async (req, res) => {
   res.json({ ok: true })
 })
 
-// ---------------------------------------------------------------------------
-// Media CDN: upload a file, get a Cloudflare-backed URL. Bytes live in an R2
-// bucket (never on this VPS — RAM is precious); Postgres keeps metadata only.
-//   POST /api/files        (x-api-key OR session)  raw body upload
-//   GET  /f/:key           public — serves permanent files (redirects to the
-//                          CDN host when R2_PUBLIC_BASE is set) and temp links
-//   GET  /api/projects/:id/files   (session) list
-//   DELETE /api/projects/:id/files/:key  (session) delete
-// Temporary uploads carry a TTL: `x-ttl` seconds. Expired files return 410 and
-// are swept (object + row) by the job runner within a minute.
-// Each key is 12 chars of url-safe randomness — URLs are unguessable like the
-// one-time login links; there is no directory listing by design.
-// ---------------------------------------------------------------------------
 const FILE_MAX_BYTES = Number(process.env.MEDIA_MAX_BYTES) || 15 * 1024 * 1024
-const FILE_MIN_TTL = 60               // 1 minute
-const FILE_MAX_TTL = 30 * 24 * 3600   // 30 days
+const FILE_MIN_TTL = 60
+const FILE_MAX_TTL = 30 * 24 * 3600
 const CONTENT_TYPE_RE = /^[\w.+-]+\/[\w.+-]+$/
 
 function fileUrlFor(row) {
@@ -828,7 +699,7 @@ function safeFilename(raw) {
   const name = String(raw || 'file').split(/[\\/]/).pop().slice(0, 200).trim()
   return name || 'file'
 }
-function newFileKey() { return crypto.randomBytes(9).toString('base64url') } // 12 chars, URL-safe
+function newFileKey() { return crypto.randomBytes(9).toString('base64url') }
 
 app.post('/api/files', projectLimiter, authenticateProject, express.raw({ type: () => true, limit: FILE_MAX_BYTES }), async (req, res) => {
   if (!(req.headers['content-length'] || '').trim() && req.body?.length === 0) return res.status(400).json({ error: 'Empty file' })
@@ -851,7 +722,6 @@ app.post('/api/files', projectLimiter, authenticateProject, express.raw({ type: 
   const r2Key = `u/${req.project.id}/${key}`
   const sha256 = crypto.createHash('sha256').update(req.body).digest('hex')
   try {
-    // Bytes first, then metadata — a failed upload leaves no lying row behind.
     await r2.putObject(r2Key, req.body, contentType)
     const expires = ttlSeconds ? new Date(Date.now() + ttlSeconds * 1000) : null
     const ins = await pool.query(
@@ -887,7 +757,6 @@ app.get('/f/:key', publicFileLimiter, async (req, res) => {
   if (row.expires_at && new Date(row.expires_at) <= new Date()) {
     return res.status(410).json({ error: 'This link has expired.' })
   }
-  // CDN configured and this file is permanent → let Cloudflare serve it.
   const base = r2.publicBase()
   if (base && !row.expires_at) {
     return res.redirect(302, base + '/' + row.r2_key.split('/').map(encodeURIComponent).join('/'))
@@ -897,14 +766,9 @@ app.get('/f/:key', publicFileLimiter, async (req, res) => {
     res.setHeader('Content-Type', row.content_type)
     res.setHeader('Content-Length', row.byte_size)
     res.setHeader('X-Content-Type-Options', 'nosniff')
-    // Unique random keys are immutable, so permanent files cache hard. Temp
-    // links must never stick in a cache. The sandbox CSP keeps served HTML/SVG
-    // from executing anything — plain bytes, not a page running with our cookies.
     res.setHeader('Cache-Control', row.expires_at ? 'no-store' : 'public, max-age=31536000, immutable')
     res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox")
     if (!row.expires_at) pool.query('UPDATE media_files SET hits = hits + 1 WHERE id = $1', [row.id]).catch(() => {})
-    // Node's fetch hands back a web ReadableStream; some runtimes and proxies
-    // give extended Node streams. Bridge web → node when needed, then pipe.
     const bodyStream = upstream.body
     const nodeReadable = bodyStream && typeof bodyStream.on === 'function' ? bodyStream : require('stream').Readable.fromWeb(bodyStream)
     nodeReadable.pipe(res)
@@ -915,8 +779,6 @@ app.get('/f/:key', publicFileLimiter, async (req, res) => {
   }
 })
 
-// Both auth paths resolve the project; session path honours team membership —
-// uploads land in the project even when a teammate uploads from the dashboard.
 async function mediaAccessGuard(req, res, next) {
   if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Project not found' })
   if (!(await projectAccessFor(req.params.id, req.user.id))) return res.status(404).json({ error: 'Project not found' })
@@ -940,8 +802,6 @@ app.delete('/api/projects/:id/files/:key', authenticate, mediaAccessGuard, async
     [req.params.id, key]
   )
   if (r.rows.length === 0) return res.status(404).json({ error: 'File not found' })
-  // Delete the bytes first — a failed row-mark is swept up by the job runner,
-  // but a marked row with live bytes would keep the object billed.
   try {
     await r2.deleteObject(r.rows[0].r2_key)
   } catch (err) {
@@ -955,9 +815,6 @@ app.delete('/api/projects/:id/files/:key', authenticate, mediaAccessGuard, async
 
 app.get('/api/env', projectLimiter, authenticateProject, async (req, res) => {
 const { environment } = req.query
-// mask=1: values never leave the server — the response carries only keys and
-// lengths, so the CLI can render dots without plaintext crossing the wire.
-// Real values require an explicit env:get per key.
 const mask = req.query.mask === '1'
 const masked = (v) => '•'.repeat(Math.max(4, Math.min(String(v).length, 16)))
 if (environment) {
@@ -985,16 +842,12 @@ app.post('/api/env', projectLimiter, authenticateProject, async (req, res) => {
 const { key, value, environment = 'production' } = req.body
 if (!key || value === undefined) return res.status(400).json({ error: 'Key and value required' })
 const existing = await pool.query('SELECT value FROM env_vars WHERE project_id = $1 AND key = $2 AND environment = $3', [req.project.id, key, environment])
-// Audit: every change is recorded, not just overwrites (old rows were 'update' only)
 await pool.query('INSERT INTO env_history (project_id, key, environment, old_value, action, actor, actor_ip) VALUES ($1, $2, $3, $4, $5, $6, $7)',
 [req.project.id, key, environment, existing.rows[0]?.value || '', existing.rows.length > 0 ? 'update' : 'set', String(req.headers['x-dkit-actor'] || '').slice(0, 120) || null, clientIp(req)])
 await pool.query(`INSERT INTO env_vars (project_id, key, value, environment) VALUES ($1, $2, $3, $4) ON CONFLICT (project_id, key, environment) DO UPDATE SET value = $3`, [req.project.id, key, value, environment])
 res.json({ success: true, message: 'Environment variable saved' })
 })
 
-// Bulk import: { vars: [{ key, value }], environment } — backs the dashboard's
-// "import .env" panel. One transaction: a bad row rolls the whole batch back.
-// Audit rows are written per variable, same as single sets.
 app.post('/api/env/import', projectLimiter, authenticateProject, async (req, res) => {
   const { vars, environment = 'production' } = req.body || {}
   if (!Array.isArray(vars) || vars.length === 0) return res.status(400).json({ error: 'vars array required' })
@@ -1050,8 +903,6 @@ await pool.query('INSERT INTO env_history (project_id, key, environment, old_val
 res.json({ success: true, message: 'Environment variable deleted' })
 })
 
-// Audit feed for a project (newest first). Values stay masked — this is a
-// record of activity, not a way to read secrets.
 app.get('/api/env/:key/history', projectLimiter, authenticateProject, async (req, res) => {
 const { environment = 'production' } = req.query
 const r = await pool.query(
@@ -1096,24 +947,9 @@ const result = await pool.query(query, params)
 res.json({ keys: result.rows, count: result.rows.length })
 })
 
-// ---------------------------------------------------------------------------
-// Cache KV — the Redis-backed counterpart to the Postgres `store` above.
-//
-// The contract is deliberately different from `store`:
-//   store  = durable JSON in Postgres (the only copy of your data)
-//   cache  = fast, TTL-first Redis strings (evictable, never the only copy)
-//
-// Storage layout: dkit:kv:<project-id>:<key>. The project id lives in the key
-// itself, so two projects can use the same key name, listing is a single SCAN
-// over that prefix, and deleting a project can purge its keyspace exactly.
-// Redis runs with maxmemory 64mb + allkeys-lru, so nothing here is promised
-// persistence — that is the point of a cache.
-// ---------------------------------------------------------------------------
 const cachePrefix = (projectId) => `dkit:kv:${projectId}:`
 const cacheKey = (projectId, key) => cachePrefix(projectId) + key
 
-// Accepts raw text/plain (curl, apps), a JSON string, or {value, ttl} from
-// the dashboard/CLI. Objects are stored as JSON text.
 function kvValue(body) {
   if (body === undefined || body === null) return ''
   if (typeof body === 'string') return body
@@ -1125,7 +961,6 @@ function kvValue(body) {
   return String(body)
 }
 
-// Returns { ttl } on success or { error } on a bad value. 0/empty = no expiry.
 function kvTtl(raw) {
   if (raw === undefined || raw === null || raw === '') return { ttl: null }
   const n = Number(raw)
@@ -1201,8 +1036,6 @@ app.post('/api/kv/flush', kvLimiter, authenticateProject, async (req, res) => {
   }
 })
 
-// GET ?raw=1 returns the value itself (for apps/curl); the default is a JSON
-// envelope with the remaining TTL so the CLI and dashboard can show it.
 app.get('/api/kv/:key', kvLimiter, authenticateProject, async (req, res) => {
   if (!KV_KEY_RE.test(req.params.key)) return res.status(400).json({ error: 'Invalid key (1-128 of A-Z a-z 0-9 . _ : -)' })
   try {
@@ -1242,8 +1075,6 @@ app.put('/api/kv/:key', kvLimiter, authenticateProject, readKvValue, async (req,
   }
 })
 
-// Redis INCRBY is atomic. SET NX with the TTL only runs when the counter does
-// not exist yet, so increments never reset an existing window or TTL.
 app.post('/api/kv/:key/incr', kvLimiter, authenticateProject, async (req, res) => {
   if (!KV_KEY_RE.test(req.params.key)) return res.status(400).json({ error: 'Invalid key (1-128 of A-Z a-z 0-9 . _ : -)' })
   const by = req.body === undefined || req.body?.by === undefined ? 1 : Number(req.body.by)
@@ -1311,7 +1142,6 @@ if (sameAsCurrent) return res.status(400).json({ error: 'New password must be di
 const hashed = await hashPassword(password)
 await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashed, userId])
 await pool.query('UPDATE password_resets SET used = TRUE WHERE token = $1', [token])
-// Security: a password reset kills every live session on every device.
 await pool.query('UPDATE sessions SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL', [userId])
 res.json({ message: 'Password updated. You can now log in.' })
 })
@@ -1363,8 +1193,6 @@ const user = userResult.rows[0]
 const redirectBase = process.env.PUBLIC_URL || 'http://localhost:' + PORT
 const banned = await pool.query('SELECT suspended, totp_enabled FROM users WHERE id = $1', [user.id])
 if (banned.rows[0]?.suspended) return res.redirect(redirectBase + '/suspended')
-// 2FA accounts can't ride an OAuth login straight in: park a challenge and
-// send the browser to the login card that asks for the authenticator code.
 if (banned.rows[0]?.totp_enabled) {
   const loginToken = crypto.randomBytes(32).toString('hex')
   await pool.query('INSERT INTO login_challenges (login_token, user_id) VALUES ($1, $2)', [loginToken, user.id])
@@ -1376,9 +1204,7 @@ const payload = encodeURIComponent(JSON.stringify({ id: user.id, email: user.ema
 res.redirect(redirectBase + '/oauth/callback#token=' + token + '&user=' + payload)
 } catch (err) { console.error('OAuth callback error:', err); res.redirect(failUrl) }
 })
-// ---------- stats helpers ----------
 const STAT_WEEKS = 12
-// One SQL shape for every weekly series so buckets always line up (Postgres weeks start Monday).
 const weeklySql = (inner) => `
   SELECT to_char(w.wk, 'YYYY-MM-DD') AS wk, COALESCE(c.n, 0)::int AS n
   FROM generate_series(
@@ -1389,7 +1215,6 @@ const weeklySql = (inner) => `
   ORDER BY w.wk`
 const weekly = async (inner, extra = []) => (await pool.query(weeklySql(inner), [STAT_WEEKS, ...extra])).rows
 
-// ---------- per-user activity (only ever the caller's own data) ----------
 app.get('/api/stats/activity', authenticate, async (req, res) => {
   try {
     const uid = req.user.id
@@ -1413,7 +1238,6 @@ app.get('/api/stats/activity/daily', authenticate, async (req, res) => {
   } catch (e) { console.error('stats error:', e); res.status(500).json({ error: 'stats failed' }) }
 })
 
-// ---------- admin (server-gated; regular users never hit these) ----------
 async function requireAdmin(req, res, next) {
   const r = await pool.query('SELECT is_admin, suspended FROM users WHERE id = $1', [req.user.id])
   if (!r.rows[0]?.is_admin || r.rows[0]?.suspended) return res.status(403).json({ error: 'Forbidden' })
@@ -1422,9 +1246,6 @@ async function requireAdmin(req, res, next) {
 
 app.get('/api/admin/session', authenticate, requireAdmin, (req, res) => { res.json({ ok: true }) })
 
-// Admin broadcast: draft in the dashboard, send to all users (or all verified
-// users). Each mail is delivered individually; a bad address never aborts the
-// rest. Returns per-address outcomes so the UI can show what actually sent.
 app.post('/api/admin/broadcast', authenticate, requireAdmin, async (req, res) => {
   const subject = String(req.body?.subject || '').trim()
   const body = String(req.body?.body || '').trim()
@@ -1491,7 +1312,6 @@ app.post('/api/admin/users/:id/suspend', authenticate, requireAdmin, async (req,
   } catch (e) { res.status(400).json({ error: 'Invalid user id' }) }
 })
 
-// Permanent. Every child table (projects, env vars, history, store, codes...) is ON DELETE CASCADE.
 app.delete('/api/admin/users/:id', authenticate, requireAdmin, async (req, res) => {
   if (req.params.id === req.user.id) return res.status(400).json({ error: "You can't delete your own account here" })
   try {
@@ -1513,15 +1333,6 @@ app.get('/api/admin/ip-clusters', authenticate, requireAdmin, async (req, res) =
   res.json(r.rows)
 })
 
-// ---------------------------------------------------------------------------
-// Shared projects (teams ↔ infra)
-//   A user can add one of THEIR OWN projects to a team they belong to. The
-//   project keeps its owner and api_key — team membership grants access:
-//     the api_key IS the credential, so everyone in the team gets full
-//     read/write on that project's secrets & store (same as being handed the
-//     key). Owner/admin gate who shares and unshares projects. Deleting the
-//     project (by its owner) removes it from every team via CASCADE.
-// ---------------------------------------------------------------------------
 function appBaseUrl(req) {
   return process.env.PUBLIC_URL || (req ? req.protocol + '://' + req.get('host') : '')
 }
@@ -1557,7 +1368,6 @@ app.post('/api/teams/:id/projects', authenticate, teamWriteLimiter, async (req, 
   if (!(await assertTeamAdmin(req, res, req.params.id))) return
   const projectId = String(req.body?.project_id || '')
   if (!UUID_RE.test(projectId)) return res.status(400).json({ error: 'Valid project_id required' })
-  // Only your own project can be shared — never someone else's
   const project = await pool.query('SELECT id, name FROM projects WHERE id = $1 AND user_id = $2', [projectId, req.user.id])
   if (project.rows.length === 0) return res.status(404).json({ error: 'Project not found (you can only share projects you own)' })
   const ins = await pool.query(
@@ -1578,15 +1388,6 @@ app.delete('/api/teams/:id/projects/:projectId', authenticate, teamWriteLimiter,
   res.json({ ok: true })
 })
 
-// ---------------------------------------------------------------------------
-// Teams
-//   roles:  owner (creator, one per team) > admin > member
-//   owner   – everything, incl. changing roles and deleting the team
-//   admin   – invite members, revoke invites, remove plain members
-//   member  – read-only view of the team
-// Invites are bound to an email address: only a signed-in account with that
-// email can accept one, so a forwarded/leaked link is useless to anyone else.
-// ---------------------------------------------------------------------------
 const inviteLink = (token) => `${process.env.PUBLIC_URL || ''}/accept-invite?token=${token}`
 const isOwnerOrAdmin = (role) => role === 'owner' || role === 'admin'
 async function teamRole(teamId, userId) {
@@ -1594,8 +1395,6 @@ async function teamRole(teamId, userId) {
   const r = await pool.query('SELECT role FROM team_members WHERE team_id = $1 AND user_id = $2', [teamId, userId])
   return r.rows[0] ? r.rows[0].role : null
 }
-// Same rule as project creation: latest verification row must be verified (OAuth signups are inserted as verified).
-// Invites are bound to an email address, so an unverified account must never be able to claim one.
 async function emailVerified(userId) {
   const r = await pool.query('SELECT verified FROM email_verifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [userId])
   return !!(r.rows[0] && r.rows[0].verified)
@@ -1638,7 +1437,6 @@ app.get('/api/teams', authenticate, async (req, res) => {
   res.json(r.rows)
 })
 
-// Invitations addressed to the signed-in account (shown in the dashboard even if the email never arrived)
 app.get('/api/teams/invites/mine', authenticate, async (req, res) => {
   if (!(await emailVerified(req.user.id))) return res.json([])
   const r = await pool.query(`
@@ -1652,7 +1450,6 @@ app.get('/api/teams/invites/mine', authenticate, async (req, res) => {
   res.json(r.rows)
 })
 
-// Public: lets the accept page say who is inviting you before you have logged in
 app.get('/api/teams/invites/preview', async (req, res) => {
   const token = String(req.query.token || '')
   if (!token) return res.status(400).json({ error: 'Token required' })
@@ -1744,7 +1541,6 @@ app.post('/api/teams/:id/invites', authenticate, inviteSendLimiter, async (req, 
   if (already.rows.length > 0) return res.status(409).json({ error: `${email} is already on this team` })
   const pending = await pool.query('SELECT COUNT(*)::int AS n FROM team_invites WHERE team_id = $1 AND accepted_at IS NULL AND expires_at > NOW()', [req.params.id])
   if (pending.rows[0].n >= MAX_PENDING_INVITES) return res.status(400).json({ error: 'Too many pending invitations. Revoke a few first.' })
-  // One live invite per address: re-inviting replaces the old link
   await pool.query('DELETE FROM team_invites WHERE team_id = $1 AND LOWER(email) = $2 AND accepted_at IS NULL', [req.params.id, email])
   const token = crypto.randomBytes(24).toString('hex')
   const ins = await pool.query(
@@ -1754,7 +1550,6 @@ app.post('/api/teams/:id/invites', authenticate, inviteSendLimiter, async (req, 
   const team = await pool.query('SELECT name FROM teams WHERE id = $1', [req.params.id])
   const emailSent = await emailInvite(ins.rows[0], team.rows[0].name, req.user.email)
   const { token: _t, ...safe } = ins.rows[0]
-  // If the email bounced (e.g. sender domain not verified yet) the invite still exists — hand back the link so it can be shared manually
   res.json({ invite: { ...safe, link: inviteLink(token) }, email_sent: emailSent })
 })
 
@@ -1816,16 +1611,10 @@ app.delete('/api/teams/:id', authenticate, teamWriteLimiter, async (req, res) =>
   res.json({ ok: true })
 })
 
-// Shared projects a user can reach: their own + ones shared into their teams.
-// used by the website's shared-projects section.
 app.get('/api/projects/shared', authenticate, async (req, res) => {
   res.json({ projects: await listSharedProjects(req.user.id) })
 })
 
-// One call for the overview cards: per-project counts of env vars, store
-// keys, cron jobs, and monitors — replaces the old N-calls-per-project fanout
-// that silently broke when keys were hashed (dashboard counted only projects
-// whose api_key the browser still had).
 app.get('/api/overview', authenticate, async (req, res) => {
   try {
     const envR = await pool.query(`
@@ -1851,16 +1640,12 @@ const websiteDist = path.join(__dirname, '../../website/dist')
 app.use(express.static(websiteDist, { setHeaders: (res) => { res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); res.setHeader('Access-Control-Allow-Origin', '*'); } }));
 app.use((req, res, next) => { if (req.path.startsWith('/api/')) return next(); res.sendFile(path.join(websiteDist, 'index.html')) })
 ;(async () => {
-  await initPromise            // schema + one-time API-key hashing migration
-  await ensureSelfProject()    // dkit-self exists and carries PUBLIC_URL
-  await loadSelfSettings()     // then let the dkit-self project fill env gaps
-  // The job runner double-fires when a second instance shares the DB for local
-  // dev — DKIT_DISABLE_JOBS=1 opts a dev instance out.
+  await initPromise
+  await ensureSelfProject()
+  await loadSelfSettings()
   if (process.env.DKIT_DISABLE_JOBS === '1') console.log('Job runner disabled (DKIT_DISABLE_JOBS=1)')
-  else jobs.startJobs()       // cron scheduler + monitor prober + log retention  await status.ensureSeed()    // status page: API/Website/Docs services
-  status.startStatusProbes()   // status page prober + uptime rollups
-  // Bind to loopback only: the Cloudflare tunnel reaches us via localhost, so
-  // port 3001 is never directly reachable from the internet.
+  else jobs.startJobs()
+  status.startStatusProbes()
   app.listen(PORT, '127.0.0.1', () => {
     console.log('Dkit API running on port ' + PORT)
     console.log('http://localhost:' + PORT + '/api/health')

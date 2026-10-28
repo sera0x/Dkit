@@ -14,14 +14,10 @@ const API_BASE = process.env.DKIT_API_URL || 'http://localhost:3001'
 function loadConfig() { try { const raw = fs.readFileSync(CONFIG_PATH, 'utf8'); return JSON.parse(raw) } catch { return {} } }
 function saveConfig(config) { fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), { mode: 0o600 }); try { fs.chmodSync(CONFIG_PATH, 0o600) } catch {} }
 function getApiClient(apiKey) { return axios.create({ baseURL: API_BASE, headers: { 'x-api-key': apiKey, 'x-dkit-actor': loadConfig().user?.email || '' } }) }
-// x-session-token lets the backend flag which listed session is THIS device
-// (used by the dashboard's devices list and 'revoke other sessions').
 function getAuthClient(token) {
   const config = loadConfig()
   return axios.create({ baseURL: API_BASE, headers: { Authorization: 'Bearer ' + token, ...(config.refresh_token ? { 'x-session-token': config.refresh_token } : {}) } })
 }
-// Sessions: the API hands out a 15-minute access token plus a 180-day refresh
-// token. We renew a minute before expiry so commands never fail mid-run.
 async function refreshSession() {
   const config = loadConfig()
   if (!config.refresh_token) return null
@@ -37,8 +33,6 @@ function jwtExpiry(token) { try { return JSON.parse(Buffer.from(token.split('.')
 async function ensureSession() {
   const config = loadConfig()
   if (!config.token) { console.log(chalk.red('Not logged in. Run: dkit login')); process.exit(1) }
-  // Freshness comes from our own expiry bookkeeping, or straight from the JWT
-  // payload (covers configs written by older CLI versions).
   const expiresAt = config.token_expires_at || jwtExpiry(config.token)
   if (config.refresh_token && Date.now() > expiresAt - 60 * 1000) {
     try { return await refreshSession() } catch {
@@ -82,7 +76,7 @@ verifySpinner.succeed('Logged in successfully — sessions auto-renew, no weekly
 })
 program.command('logout').description("Log out and revoke this device's session").action(async () => {
 const config = loadConfig()
-try { if (config.refresh_token) await axios.post(API_BASE + '/api/auth/logout', { refresh_token: config.refresh_token }) } catch { /* revocation is best-effort */ }
+try { if (config.refresh_token) await axios.post(API_BASE + '/api/auth/logout', { refresh_token: config.refresh_token }) } catch {  }
 delete config.token; delete config.refresh_token; delete config.token_expires_at; delete config.user
 saveConfig(config)
 console.log(chalk.green('Logged out'))
@@ -128,7 +122,6 @@ const authed = getAuthClient(token)
 const response = await authed.post('/api/projects', { name })
 const project = response.data
 const config = loadConfig(); if (!config.apiKeys) config.apiKeys = {}; config.currentProject = name; saveConfig(config)
-// The project starts keyless; issue its first key now (one-time display).
 spinner.text = 'Issuing API key...'
 const keyRes = await authed.post('/api/projects/' + project.id + '/api-key')
 config.apiKeys[name] = keyRes.data.api_key; saveConfig(config)
@@ -147,7 +140,6 @@ saveConfig(config)
 projects.forEach(p => {
 const isCurrent = config.currentProject === p.name
 console.log((isCurrent ? '>' : ' ') + ' ' + p.name + (isCurrent ? ' ' + chalk.green('(active)') : ''))
-// Keys are hashed server-side, so the full key only exists where the user saved it.
 console.log('   API Key: ' + chalk.dim(p.api_key ? (options.show ? p.api_key : maskKey(p.api_key)) : (p.key_prefix ? p.key_prefix + '…' : 'hidden — use dkit keys:rotate to reissue'))) 
 console.log('   ID: ' + chalk.dim(p.id))
 console.log()
@@ -264,11 +256,6 @@ program.command('store:delete <key>').description('Delete a key from the key-val
 const apiKey = getProjectApiKey(); const client = getApiClient(apiKey); const spinner = ora('Deleting ' + key + '...').start()
 try { await client.delete('/api/store/' + key); spinner.succeed(key + ' deleted') } catch (error) { spinner.fail('Failed to delete key'); console.log(chalk.red(error.response?.data?.error || error.message)) }
 })
-// ==========================================================================
-// CACHE — Redis-backed KV. This is the fast, TTL-first sibling of `store:*`:
-// values are plain strings, counters are atomic, and entries are EVICTABLE
-// (maxmemory 64mb / allkeys-lru). Never keep the only copy of anything here.
-// ==========================================================================
 function kvClient() { return getApiClient(getProjectApiKey()) }
 function kvError(error) { console.log(chalk.red(error.response?.data?.error || error.message)) }
 program.command('kv:set <key> <value>').description('Set a cache value (string), optionally with a TTL').option('--ttl <seconds>', 'Expire after N seconds (1-2592000)').action(async (key, value, options) => {
@@ -310,10 +297,6 @@ program.command('kv:flush').description('Delete every cache key in this project'
   }
   try { const response = await kvClient().post('/api/kv/flush'); console.log(chalk.green('Flushed ' + response.data.deleted + ' key(s)')) } catch (error) { kvError(error) }
 })
-// ==========================================================================
-// CRON — schedule HTTP calls from the API. Schedules are human strings:
-//   5m, 30s, 2h, daily 09:30, mon 09:00  (all UTC)
-// ==========================================================================
 function linkedProjectId() { const state = findLinkState(); if (!state?.projectId) { console.log(chalk.red('This folder is not linked to a project. Run: dkit new <name>')); process.exit(1) } return state.projectId }
 function authClientForJobs() { return getAuthClient(loadConfig().token) }
 function printCronJob(j) {
@@ -387,12 +370,6 @@ program.command('cron:rm <name>').description('Delete a cron job').action(async 
   } catch (error) { console.log(chalk.red(error.response?.data?.error || error.message)) }
 })
 
-// ==========================================================================
-// MEDIA CDN — upload a file, get a Cloudflare-backed URL.
-//   dkit upload img.png            permanent URL (as long as you keep it)
-//   dkit share img.png             temporary link (15m default) for testing
-// Listing/cleanup is done against the linked project via the JWT.
-// ==========================================================================
 const MIME_BY_EXT = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
   '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.avif': 'image/avif',
@@ -486,9 +463,6 @@ program.command('files:rm <key>').description('Delete a media file (URL stops wo
   } catch (error) { console.log(chalk.red(error.response?.data?.error || error.message)) }
 })
 
-// ==========================================================================
-// UPTIME MONITORS — the API probes your URLs, emails you on down/up.
-// ==========================================================================
 function printMonitor(m) {
   const dot = m.paused ? chalk.dim('○') : m.status === 'up' ? chalk.green('●') : m.status === 'down' ? chalk.red('●') : chalk.yellow('●')
   console.log(dot + ' ' + chalk.cyan(m.name) + (m.paused ? chalk.dim(' (paused)') : ''))
@@ -531,14 +505,10 @@ program.command('monitor:rm <name>').description('Delete a monitor').action(asyn
   } catch (error) { console.log(chalk.red(error.response?.data?.error || error.message)) }
 })
 
-// ==========================================================================
-// LOG DRAIN — ship logs from any app; tail them here.
-// ==========================================================================
 program.command('logs:ship [message]').description('Ship a log line (or JSON events from stdin) to your project\'s log drain').option('-l, --level <level>', 'debug | info | warn | error', 'info').option('-s, --source <source>', 'Source label, e.g. worker or deploy-script').option('-m, --meta <json>', 'Metadata JSON, e.g. \'{"requestId":"abc"}\'').action(async (message, options) => {
   const apiKey = getProjectApiKey(); const client = getApiClient(apiKey)
   let events
   if (!message && !process.stdin.isTTY) {
-    // Piped input: one JSON event/object per line — works with shell pipes.
     const raw = fs.readFileSync(0, 'utf8')
     events = raw.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => { try { const parsed = JSON.parse(line); return typeof parsed === 'object' && parsed !== null ? parsed : { message: String(parsed) } } catch { return { message: line } } })
   } else {
@@ -557,7 +527,6 @@ program.command('logs:tail').description('Show recent logs for the linked projec
   try {
     const projectId = state?.projectId
     if (!projectId) { console.log(chalk.red('This folder is not linked. Run: dkit new <name>')); process.exit(1) }
-    // Log reads are session-authed (x-project-id) — the CLI uses the JWT.
     const r = await getAuthClient(loadConfig().token).get('/api/projects/' + projectId + '/logs', { params })
     const logs = r.data.logs
     if (logs.length === 0) { console.log('No logs yet. Ship some: dkit logs:ship "deploy finished"'); return }
@@ -599,7 +568,6 @@ const ok = (label, detail) => rows.push(['ok', label, detail])
 const warn = (label, detail, fix) => { rows.push(['warn', label, detail]); if (fix) fixes.push(fix) }
 const fail = (label, detail, fix) => { rows.push(['fail', label, detail]); if (fix) fixes.push(fix) }
 
-// 1. API reachability
 try {
 const started = Date.now()
 const health = await axios.get(API_BASE + '/api/health', { timeout: 8000 })
@@ -608,7 +576,6 @@ ok('API', (health.data?.version ? 'v' + health.data.version : 'reachable') + ' �
 fail('API', 'unreachable at ' + API_BASE + ' — ' + (error.response?.data?.error || error.message), 'Check that the Dkit API is running and that DKIT_API_URL points at it.')
 }
 
-// 2. Auth + session health (a failed refresh means the user must re-login)
 let authClient = null
 if (!config.token) {
 fail('Auth', 'not logged in — run: dkit login', 'Run: dkit login')
@@ -625,7 +592,6 @@ catch (error) { fail('Auth', error.response?.status === 401 ? 'token rejected �
 }
 }
 
-// 3. Project link (walks up from cwd like every project-scoped command)
 const state = findLinkState()
 if (!state?.project) {
 warn('Project link', 'this folder is not linked — run: dkit new <name> (or check .dkit/state.json)', 'From the project folder, run: dkit new <name> — or re-link with dkit projects:list.')
@@ -633,7 +599,6 @@ warn('Project link', 'this folder is not linked — run: dkit new <name> (or che
 ok('Project link', state.project + (state.defaultEnv ? ' (default env: ' + state.defaultEnv + ')' : ''))
 }
 
-// 4. API key actually works
 if (state?.project && config.apiKeys?.[state.project]) {
 try {
 await getApiClient(config.apiKeys[state.project]).get('/api/store', { params: { prefix: 'healthcheck-probe' }, timeout: 8000 })
@@ -644,7 +609,6 @@ else warn('API key', 'could not verify — ' + (error.response?.data?.error || e
 }
 }
 
-// 5. Email verification (blocks project creation and invites)
 if (authClient) {
 try {
 const v = await authClient.get('/api/auth/verification-status')
@@ -654,21 +618,19 @@ ok('Email verified', 'yes')
 let detail = 'no — verify to create projects and teams (dkit verify:send)'
 if (options.fix) {
 try { await authClient.post('/api/auth/send-verification'); detail += ' — code sent, check your inbox' }
-catch { /* keep the manual hint */ }
+catch {  }
 }
 warn('Email verified', detail, detail.includes('code sent') ? null : 'Run: dkit verify:send, then enter the code from your email.')
 }
-} catch { /* auth already reported; don't double-report */ }
+} catch {  }
 }
 
-// 6. Node/npm sanity
 const nodeMajor = Number(process.versions.node.split('.')[0])
 nodeMajor >= 18 ? ok('Node', 'v' + process.versions.node) : warn('Node', 'v' + process.versions.node + ' is old', 'Upgrade to Node 18+ — templates and tooling assume it.')
 
-// 7. Project folder scan — the stuff that bites later, caught early.
 const cwd = process.cwd()
 let pkg = null
-try { pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8')) } catch { /* not a Node project or missing */ }
+try { pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8')) } catch {  }
 if (pkg) {
 const scripts = pkg.scripts || {}
 const missing = ['start', 'dev', 'build'].filter((s) => !scripts[s])
@@ -717,10 +679,6 @@ catch { warn('Git', 'could not run git init', 'Install git, then run: git init')
 warn('Git', 'no repository here', 'Run git init so you have history and clean rollbacks. (or: dkit doctor --fix)')
 }
 
-// 8. Syntax check — parse every JS file in the project (node_modules etc skipped).
-// vm.Script parses CommonJS-flavored syntax; ESM files (import/export at top
-// level) report a recognizable error which we count as "module file, skipped"
-// rather than a failure, so valid projects never get false positives.
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', '.next', '.cache'])
 const jsFiles = []
 ;(function walk(dir, depth) {
@@ -732,7 +690,7 @@ if (SKIP_DIRS.has(e.name)) continue
 const full = path.join(dir, e.name)
 if (e.isDirectory()) walk(full, depth + 1)
 else if (/\.(js|mjs|cjs)$/.test(e.name)) {
-try { if (fs.statSync(full).size <= 512 * 1024) jsFiles.push(full) } catch { /* unreadable — leave it */ }
+try { if (fs.statSync(full).size <= 512 * 1024) jsFiles.push(full) } catch {  }
 }
 }
 })(cwd, 0)
@@ -816,8 +774,6 @@ program
   if (!config.apiKeys) config.apiKeys = {}
   config.currentProject = project.name
   saveConfig(config)
-  // Projects start keyless — the CLI needs a key for API calls, so issue the
-  // first one here unless the user linked an existing project that has one.
   if (!project.api_key && !options.link) {
     try {
       const keyRes = await auth.post('/api/projects/' + project.id + '/api-key')
@@ -889,7 +845,6 @@ try {
 const list = await getAuthClient(token).get('/api/projects')
 const project = list.data.projects.find((p) => p.name === name)
 if (!project) { console.log(chalk.red('No project named "' + name + '" on your account.')); process.exit(1) }
-// Keyless projects get a key issued; keyed ones get a destructive rotation.
 if (!project.key_prefix) {
 const issued = await getAuthClient(token).post('/api/projects/' + project.id + '/api-key')
 const next = loadConfig(); if (!next.apiKeys) next.apiKeys = {}; next.apiKeys[name] = issued.data.api_key; if (!next.currentProject) next.currentProject = name; saveConfig(next)

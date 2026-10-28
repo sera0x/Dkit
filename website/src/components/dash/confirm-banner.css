@@ -1,16 +1,5 @@
-/* Type-to-confirm banner — terminal-styled destructive-action confirmation.
-   Layout is a small dialog: head row (icon + label + close), hint line, then
-   the $ prompt row. Motion rides the transitions.dev tokens: panel entrance
-   (rise + fade + blur), wrong input shakes on --distance-small.
-
-   Focus: feedback is RED inside the banner. The shell-wide green focus floor
-   uses :focus-visible on inputs; because the prompt input autofocuses, that
-   ring would light up on open — so :focus/:focus-visible on the input are
-   explicitly suppressed (!important) and the prompt row carries the focus
-   state via :focus-within instead. */
-
 .confirm-banner {
-  grid-column: 1 / -1; /* full width when the parent is a table-row grid */
+  grid-column: 1 / -1;
   margin: 0.6rem 0 0.35rem;
   padding: 0.85rem 1rem 0.95rem;
   border: 1px solid rgba(255, 92, 92, 0.45);
@@ -18,8 +7,6 @@
   background: rgba(255, 92, 92, 0.06);
   animation: confirmBannerIn var(--duration-fast) var(--ease-smooth-out) backwards;
 }
-
-/* head row */
 .confirm-banner-head {
   display: flex;
   align-items: center;
@@ -57,16 +44,12 @@
   cursor: pointer;
 }
 .confirm-banner-close:hover { color: var(--text); background: var(--surface-raised); }
-
-/* hint */
 .confirm-banner-hint {
   margin: 0 0 0.7rem;
   font-size: 0.85rem;
   line-height: 1.5;
   color: var(--text);
 }
-
-/* prompt row: $ + input + delete button */
 .confirm-banner-prompt {
   display: flex;
   align-items: center;
@@ -105,7 +88,6 @@
   color: var(--text);
   outline: none !important;
 }
-/* Kill the shell-wide green focus ring on this autofocused input. */
 .confirm-banner-prompt input:focus,
 .confirm-banner-prompt input:focus-visible {
   outline: none !important;

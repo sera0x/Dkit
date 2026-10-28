@@ -47,9 +47,6 @@ skills-lock.json
 /scripts/update.sh
 /releases/
 
-# Migration bundle artifacts. The extracted archive carries the Postgres
-# dump, backend/.env, the GitHub SSH key and the Cloudflare tunnel
-# credentials — extracting it inside the repo must never lead to a commit.
 /dkit-migration-*/
 /env/
 /ssh/
@@ -65,13 +62,11 @@ skills-lock.json
 id_rsa
 id_ed25519
 *_ed25519
-# Local machine/agent state and copied-in credentials
 .freebuff/
 backend/logs/
 *credentials*.json
 keys.txt
 
-# Local ops/dev scripts — not part of the public repo
 /scripts/backup-db.sh
 /scripts/disk-check.sh
 /scripts/package-release.sh

@@ -1,8 +1,3 @@
-// Sends one of EVERY email design to the first admin (or an address passed as
-// argv[2]) so the whole set can be eyeballed in a real inbox (Gmail etc).
-// Run: cd backend && node ../scripts/send-preview-emails.js [you@example.com]
-// Nothing is written to the DB except what the mails themselves imply — the
-// codes/links in them are demo values, not usable credentials.
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'development'
 const { pool } = require('../backend/src/db')
@@ -35,7 +30,7 @@ async function main() {
     const ok = await fn()
     console.log((ok ? '  sent    ' : '  FAILED  ') + name)
     if (!ok) failed++
-    await wait(400) // stay friendly to the send provider
+    await wait(400)
   }
   console.log(failed === 0 ? '\nAll ' + jobs.length + ' sent — check the inbox.' : '\n' + failed + ' failed — check server logs for the Resend error.')
   await pool.end()

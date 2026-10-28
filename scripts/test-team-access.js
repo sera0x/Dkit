@@ -1,11 +1,3 @@
-// One-off end-to-end test: team-shared project access (the "can't open shared
-// secrets" bug). Run: cd backend && node ../scripts/test-team-access.js
-//
-// Creates two throwaway users + a team + shared/own projects directly in the
-// DB, then drives the REAL functions the API routes use: projectAccessFor()
-// (all 15 project route gates + verify-key) and the actual authenticateProject
-// middleware with a signed member JWT. No HTTP, no emails. Cleans up after
-// itself by deleting the users (everything cascades).
 
 process.env.NODE_ENV = process.env.NODE_ENV || 'development'
 const crypto = require('crypto')
@@ -55,15 +47,11 @@ async function main() {
 
     console.log('fixtures created — running checks…')
 
-    // --- helper gate (what all 15 project routes + verify-key now use) ---
     check('owner sees own project via projectAccessFor', !!(await projectAccessFor(sharedPid, ownerId)))
     check('member sees shared project via projectAccessFor', !!(await projectAccessFor(sharedPid, memberId)))
     check('member blocked from non-shared project', !(await projectAccessFor(ownPid, memberId)))
     check('outsider blocked from shared project', !(await projectAccessFor(sharedPid, outsiderId)))
 
-    // --- the real dashboard middleware with a signed JWT ---
-    // Resolves either when next() is called (granted) or when the middleware
-    // writes a response (blocked).
     const call = (userId, projectId) => new Promise((resolve) => {
       const req = {
         headers: {
@@ -83,7 +71,6 @@ async function main() {
     check('member JWT blocked from non-shared project (404)', !(await call(memberId, ownPid)).nextCalled)
     check('outsider JWT blocked from shared project (404)', !(await call(outsiderId, sharedPid)).nextCalled)
 
-    // API-key path must still work (owner uses the plaintext key)
     const key = (await pool.query('SELECT api_key FROM projects WHERE id = $1', [sharedPid])).rows[0].api_key
     const reqKey = { headers: { 'x-api-key': key } }
     const resKey = { statusCode: 0, body: null, status(c) { this.statusCode = c; return this }, json(b) { this.body = b; return this } }
@@ -91,7 +78,6 @@ async function main() {
     await auth.authenticateProject(reqKey, resKey, () => { keyNext = true })
     check('API-key path still works unchanged', keyNext && reqKey.project.id === sharedPid)
   } finally {
-    // users cascade: projects, team_projects, teams, team_members
     for (const id of [ownerId, memberId, outsiderId].filter(Boolean)) {
       await pool.query('DELETE FROM users WHERE id = $1', [id])
     }
@@ -105,5 +91,4 @@ async function main() {
 
 main().catch((e) => { console.error(e); process.exit(1) })
 
-// Hard watchdog: never hang the session — print where we got stuck.
 setTimeout(() => { console.error('TEST TIMEOUT — stuck waiting on DB/middleware'); process.exit(2) }, 45000)

@@ -1,7 +1,3 @@
-// Per-route title, description and canonical URL. index.html ships the
-// homepage defaults so crawlers that never run JS still see real meta; this
-// keeps the tab and the canonical honest on every other route (the site is a
-// single-page app, so the static head would otherwise say "homepage" everywhere).
 import { SITE_URL } from './site';
 
 const SITE = SITE_URL;

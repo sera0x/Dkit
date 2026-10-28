@@ -1,8 +1,6 @@
 import React from 'react';
 import AppShell from '../components/app/AppShell';
 
-// Dead-face icon for the 404: X eyes, wavy mouth. Single color — drawn inline
-// so it inherits whatever the theme gives it, no special palette of its own.
 function DeadFace() {
   return (
     <svg className="notfound-face" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="A dizzy, dead-looking face with X eyes">
@@ -18,10 +16,6 @@ function DeadFace() {
   );
 }
 
-// 404 for anything that isn't a real route. Previously unknown paths silently
-// rendered the homepage, which made typos and stale links look like the site
-// was broken. Uses the app shell so logged-in users keep the sidebar (AppShell
-// degrades to a login button for logged-out visitors).
 export default function NotFound() {
   return (
     <AppShell>

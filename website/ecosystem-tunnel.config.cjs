@@ -1,4 +1,3 @@
-// PM2 ecosystem configuration for dkit-tunnel
 module.exports = {
   apps: [{
     name: 'dkit-tunnel',

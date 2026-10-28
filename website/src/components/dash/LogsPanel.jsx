@@ -12,8 +12,6 @@ const fmtTime = (iso) => {
   } catch { return ''; }
 };
 
-// Log drain tab: everything shipped via `dkit logs:ship`, POST /api/logs, or
-// the dashboard form — tailed here. 7-day retention.
 export default function LogsPanel({ token, project }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +23,7 @@ export default function LogsPanel({ token, project }) {
   const [sending, setSending] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [clearing, setClearing] = useState(false);
-  const [confirmClear, setConfirmClear] = useState(false); // type-to-confirm for clearing the drain
+  const [confirmClear, setConfirmClear] = useState(false);
   useEffect(() => {
     if (!confirmClear) return;
     const onKey = (e) => { if (e.key === 'Escape') setConfirmClear(false); };
@@ -43,7 +41,6 @@ export default function LogsPanel({ token, project }) {
     finally { setLoading(false); }
   }, [token, project.id, level, search]);
 
-  // Gentle live tail: re-fetch every 5s while the tab is open (and stop when hidden).
   useEffect(() => { setLoading(true); load(); }, [load]);
   useEffect(() => {
     if (!autoRefresh) return;

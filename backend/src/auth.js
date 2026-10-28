@@ -20,9 +20,6 @@ async function verifyPassword(password, hash) {
   return await bcrypt.compare(password, hash)
 }
 
-// Short-lived access token. Clients (website + CLI) silently exchange their
-// long-lived refresh token for a fresh one, so people only re-log-in when a
-// device is lost — not every seven days.
 const ACCESS_TOKEN_TTL = '15m'
 
 function generateToken(userId) {
@@ -61,8 +58,6 @@ async function authenticate(req, res, next) {
     let expired = false
     try { decoded = jwt.verify(token, JWT_SECRET) } catch (err) { expired = err?.name === 'TokenExpiredError' }
     if (!decoded) {
-      // `token_expired` is the machine-readable signal the website/CLI use to
-      // silently refresh and retry; plain invalid tokens get no code.
       return res.status(401).json(expired
         ? { error: 'Token expired', code: 'token_expired' }
         : { error: 'Invalid or expired token' })
@@ -84,14 +79,6 @@ async function authenticate(req, res, next) {
   }
 }
 
-// Two ways to resolve a project:
-//   1. x-api-key (CLI / HTTP API) — hashed lookup, as before.
-//   2. Bearer session + x-project-id (the dashboard) — API keys are hashed at
-//      rest now, so the browser can't hold one; people act on projects through
-//      their login session instead.
-//      The session path grants access to projects shared into the user's teams
-//      too — membership IS the grant (env, store, cron, monitors, logs). Only
-//      project management (delete, rotate) stays owner-only in server.js.
 async function authenticateProject(req, res, next) {
   try {
     const apiKey = req.headers['x-api-key']

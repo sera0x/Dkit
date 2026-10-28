@@ -1,7 +1,3 @@
-// Minimal TOTP (RFC 6238: SHA-1, 6 digits, 30-second step) with Base32
-// encoding — node's crypto module covers everything, so authenticator apps
-// (Aegis, 1Password, Google Authenticator, ...) interoperate with zero new
-// dependencies.
 const crypto = require('crypto')
 
 const B32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
@@ -53,8 +49,6 @@ function totpAt(secretBuf, counter) {
   return String(code % 1000000).padStart(6, '0')
 }
 
-// ±1 step of drift tolerance (±30s) — the standard window; tighter than that
-// and phone clock drift locks people out, looser and codes replay longer.
 function verifyTotp(secret, token, window = 1) {
   if (!secret) return false
   const t = String(token || '').replace(/\s/g, '')

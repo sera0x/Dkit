@@ -15,8 +15,6 @@ const fmtDate = (iso) => {
 
 const STATUS_LABEL = { up: 'up', down: 'down', pending: 'pending' };
 
-// Uptime monitors tab: dkit probes your URLs every N seconds and emails you
-// when something flips down (and again when it recovers).
 export default function MonitorsPanel({ token, project, userEmail }) {
   const [monitors, setMonitors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +27,7 @@ export default function MonitorsPanel({ token, project, userEmail }) {
   const [creating, setCreating] = useState(false);
 
   const [confirmTag, setConfirmTag] = useState('');
-  const [confirmFor, setConfirmFor] = useState(null); // type-to-confirm banner target (deletions)
+  const [confirmFor, setConfirmFor] = useState(null);
   useEffect(() => {
     if (!confirmFor) return;
     const onKey = (e) => { if (e.key === 'Escape') setConfirmFor(null); };
@@ -76,7 +74,6 @@ export default function MonitorsPanel({ token, project, userEmail }) {
     catch (err) { setError(err.message); }
   };
 
-  // Danger zone: bulk pause/resume/delete across every monitor in this project.
   const pausedCount = monitors.filter((m) => m.paused).length;
 
   const pauseAll = async () => {

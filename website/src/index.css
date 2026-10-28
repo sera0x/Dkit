@@ -12,10 +12,6 @@
 --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 --font-sans: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
 }
-/* Safari renders slightly darker / more saturated than Chrome/Firefox because it
-   doesn't apply font smoothing to transparent-on-light text the same way. To keep
-   whites looking like Chrome's: antialiased text + pure white surfaces + sRGB
-   colors (no color-mix/oklch, which WebKit gamut-maps differently). */
 html {
 background: var(--bg);
 -webkit-font-smoothing: antialiased;
@@ -31,12 +27,7 @@ font-family: var(--font-sans);
 -moz-osx-font-smoothing: grayscale;
 transition: color var(--duration-quick) var(--ease-out);
 }
-/* Form controls and buttons don't inherit the body font by default — make
-   them, so "sans by default, mono only for real code" holds without every
-   component restating it. */
 button, input, select, textarea { font-family: inherit; }
-
-/* Motion tokens (transitions.dev scale) — referenced by dashboard.css */
 :root {
   --duration-stagger: 40ms;
   --duration-micro: 80ms;
@@ -61,8 +52,6 @@ transition-duration: 0.01ms !important;
 scroll-behavior: auto !important;
 }
 }
-/* Light mode: WhatsApp-white — pure white canvas, faint grey surfaces, one
-   restrained emerald accent. No tinted cream, no washed borders. */
 .dash-shell[data-theme='light'] {
 --bg: #ffffff;
 --surface: #f7f8f7;
@@ -75,23 +64,11 @@ scroll-behavior: auto !important;
 --border: rgba(11, 13, 12, 0.10);
 --border-strong: rgba(11, 13, 12, 0.55);
 }
-
-/* The browser chrome (iOS status bar, overscroll area) follows <html>/<body>, which are
-   ANCESTORS of .dash-shell — so the shell's light-mode --bg override never reaches them.
-   AppShell sets data-chrome="light" on <html> while it is showing light mode (and removes
-   it on unmount), so the page background and the status bar always match what is on screen. */
 html[data-chrome='light'],
 html[data-chrome='light'] body {
   background: #ffffff;
   color-scheme: light;
 }
-
-/* Portaled elements (the navbar drawer renders via createPortal into
-   document.body) sit outside .dash-shell/.marketing-shell, so the shells'
-   light-token overrides never reach them. The chrome attribute lives on
-   <html>, an ancestor of everything, and is present exactly while a shell is
-   in light mode — so the same palette is restated here. Keep in sync with the
-   two shell blocks above. */
 html[data-chrome='light'] {
   --bg: #ffffff;
   --surface: #f7f8f7;
@@ -109,21 +86,11 @@ input::placeholder, textarea::placeholder {
   color: var(--text-muted);
   opacity: 1;
 }
-
-/* The logo PNG is white-on-black with no alpha — invert it in light mode.
-   The chrome attribute scopes the navbar rule so portaled drawer logos
-   (outside the marketing shell) are covered too. */
 .dash-shell[data-theme='light'] .dash-side-logo,
 .dash-shell[data-theme='light'] .dash-topbar-brand img,
 html[data-chrome='light'] .navbar-logo {
   filter: invert(1);
 }
-
-/* Every marketing page (home, login, signup, password reset) is wrapped in
-   .marketing-shell (MarketingShell.jsx), which carries the same data-theme
-   switch and dkit_theme storage key as the dashboard shell. It paints its own
-   --bg so transparent sections (the hero) never show the dark :root canvas
-   behind it. */
 .marketing-shell {
   background: var(--bg);
   min-height: 100vh;
@@ -141,8 +108,6 @@ html[data-chrome='light'] .navbar-logo {
   --border: rgba(11, 13, 12, 0.10);
   --border-strong: rgba(11, 13, 12, 0.55);
 }
-
-/* Shared page header — Dashboard, Docs, Changelog */
 .page-header {
   display: flex;
   align-items: center;
@@ -181,14 +146,8 @@ html[data-chrome='light'] .navbar-logo {
     font-size: 1.3rem;
   }
 }
-
-/* Never let anything widen the page (iOS Safari zooms out / shifts left when it does) */
 html, body { max-width: 100%; overflow-x: clip; }
-
-/* iOS auto-zooms into any input under 16px and often stays zoomed after blur */
 @media (hover: none) and (pointer: coarse) {
   input, textarea, select { font-size: 16px !important; }
 }
-
-/* Status-bar tint strip (lib/browserChrome.js): sits under the topbar/drawer, never visible */
 #dkit-chrome-tint { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: -1; pointer-events: none; display: none; }

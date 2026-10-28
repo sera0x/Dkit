@@ -15,8 +15,6 @@ const fmtDate = (iso) => {
 
 const SCHEDULE_PLACEHOLDER = 'e.g. 5m, 2h, daily 09:30 (UTC)';
 
-// Cron tab: schedule outbound HTTP calls from the API — ping endpoints,
-// rollups, cleanup tasks — without owning a server that stays awake.
 export default function CronPanel({ token, project }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,18 +24,18 @@ export default function CronPanel({ token, project }) {
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
   const [schedule, setSchedule] = useState('');
-  const [advanced, setAdvanced] = useState(false); // common shows the essentials; advanced reveals method/body/headers
-  const [method, setMethod] = useState('AUTO');    // auto: GET for a plain ping, POST once a body is set
+  const [advanced, setAdvanced] = useState(false);
+  const [method, setMethod] = useState('AUTO');
   const [body, setBody] = useState('');
   const [headers, setHeaders] = useState([{ k: '', v: '' }]);
   const [creating, setCreating] = useState(false);
 
-  const [openRuns, setOpenRuns] = useState(null); // jobId whose runs are expanded
+  const [openRuns, setOpenRuns] = useState(null);
   const [runs, setRuns] = useState([]);
   const [runsLoading, setRunsLoading] = useState(false);
 
   const [confirmTag, setConfirmTag] = useState('');
-  const [confirmFor, setConfirmFor] = useState(null); // type-to-confirm banner target (deletions)
+  const [confirmFor, setConfirmFor] = useState(null);
   useEffect(() => {
     if (!confirmFor) return;
     const onKey = (e) => { if (e.key === 'Escape') setConfirmFor(null); };
@@ -118,9 +116,6 @@ export default function CronPanel({ token, project }) {
     await loadRuns(jobId);
   };
 
-  // Danger zone: bulk pause/resume/delete across every job in this project.
-  // Sequential: the API is per-job, and this keeps results correct
-  // if one delete fails midway.
   const pausedCount = jobs.filter((j) => !j.enabled).length;
 
   const pauseAll = async () => {

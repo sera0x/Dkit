@@ -1,12 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { TerminalSquare, X } from 'lucide-react';
 
-// Type-to-confirm banner for destructive actions. Renders inline (under the
-// row / inside the danger card) as a small terminal-styled dialog:
-//   * head row: icon + "confirm with a command" label + close button
-//   * hint: one plain-language line about what happens
-//   * prompt: $ + the command to type, Enter (or the delete button) runs it
-// Esc cancels. Wrong text shakes the input and clears it; nothing deletes.
 export default function ConfirmBanner({ prompt, hint, onConfirm, onCancel }) {
   const [value, setValue] = useState('');
   const [wrong, setWrong] = useState(false);
@@ -16,7 +10,6 @@ export default function ConfirmBanner({ prompt, hint, onConfirm, onCancel }) {
 
   const submit = () => {
     if (value.trim() === prompt) { onConfirm(); return; }
-    // Wrong command: replay the shake (remove → reflow → re-add), keep open.
     setWrong(false);
     void inputRef.current?.offsetWidth;
     setWrong(true);

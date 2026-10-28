@@ -6,7 +6,7 @@ import CodeSlots from '../components/ui/CodeSlots';
 import './auth.css';
 
 export default function Login({ onNavigate }) {
-  const [step, setStep] = useState('credentials'); // 'credentials' | 'code' | 'twofa'
+  const [step, setStep] = useState('credentials');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
@@ -28,9 +28,6 @@ export default function Login({ onNavigate }) {
 
   useEffect(() => {
     api.oauthProviders().then(setProviders).catch(() => {});
-    // OAuth logins for 2FA accounts bounce back here with a pending challenge:
-    // the provider already proved who they are, the authenticator code is the
-    // remaining step.
     const challenge = new URLSearchParams(window.location.search).get('challenge');
     if (challenge) {
       setLoginToken(challenge);
@@ -51,8 +48,6 @@ export default function Login({ onNavigate }) {
     try {
       const data = await api.loginInitiate(email, password);
       setLoginToken(data.login_token);
-      // 2FA accounts get an authenticator challenge — no email is sent by the
-      // server for them, so never show the 'code we emailed you' screen.
       setStep(data.two_factor ? 'twofa' : 'code');
     } catch (err) {
       if (err.status === 403) { goTo('/suspended'); return; }
@@ -62,9 +57,6 @@ export default function Login({ onNavigate }) {
     }
   };
 
-  // Auto-submitted by CodeSlots onComplete with the just-completed code, or by
-  // the button as a manual fallback. submittingRef guards double submits
-  // (auto-submit fires on the 6th digit; a form submit could race it).
   const submitCode = async (value) => {
     if (submittingRef.current || !/^\d{6}$/.test(value)) return;
     submittingRef.current = true;
@@ -78,15 +70,12 @@ export default function Login({ onNavigate }) {
       submittingRef.current = false;
       if (err.status === 403) { goTo('/suspended'); return; }
       setError(err.message || 'Invalid or expired code');
-      setCodeStatus('error'); // CodeSlots drains the digits and clears itself
+      setCodeStatus('error');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Second factor for 2FA accounts: an authenticator code, or a recovery code
-  // typed into the same field (the server accepts either against the same
-  // challenge).
   const submitTwoFa = async (value) => {
     const v = String(value || '').trim();
     if (submittingRef.current || !v) return;
@@ -108,7 +97,7 @@ export default function Login({ onNavigate }) {
 
   const handleCodeChange = (value) => {
     setCode(value);
-    if (value === '') setCodeStatus('idle'); // reset after the error drain
+    if (value === '') setCodeStatus('idle');
   };
 
   return (

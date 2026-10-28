@@ -2,7 +2,6 @@
 set -eu
 
 REPO="${DKIT_REPO:-sera0x/Dkit}"
-# To ship a release: tag the commit (v0.1.0), build the tarball with
 BUNDLE="dkit-cli"
 
 fail() {
@@ -32,9 +31,6 @@ else
 fi
 ver="${tag#v}"
 
-# DKIT_RELEASES_URL points at a mirror of the release assets (one directory
-# holding <bundle>-<version>.tar.gz and checksums.txt) — for self-hosted
-# installs and testing.
 base_url="${DKIT_RELEASES_URL:-https://github.com/$REPO/releases/download/$tag}"
 
 archive="${BUNDLE}-${ver}.tar.gz"

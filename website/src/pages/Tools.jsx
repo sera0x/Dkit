@@ -3,11 +3,7 @@ import { Wrench } from 'lucide-react';
 import AppShell from '../components/app/AppShell';
 import './tools.css';
 
-// Every tool on this page is pure browser code: crypto.getRandomValues,
-// crypto.randomUUID, crypto.subtle, btoa/atob. Nothing posts back to the API,
-// which is the whole point of putting these next to a secrets manager.
 
-/* ---------- shared bits ---------- */
 
 function CopyButton({ value, label = 'Copy' }) {
   const [copied, setCopied] = useState(false);
@@ -34,7 +30,6 @@ function ToolCard({ title, subtitle, wide, children }) {
   );
 }
 
-/* ---------- secret generator ---------- */
 
 const SETS = {
   upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
@@ -50,8 +45,6 @@ function genSecret(len, sets) {
     (sets.digits ? SETS.digits : '') +
     (sets.symbols ? SETS.symbols : '');
   if (!charset || len < 1) return '';
-  // Rejection sampling keeps every character equally likely even when the
-  // charset length doesn't divide 256.
   const out = [];
   const buf = new Uint8Array(len * 2 + 8);
   const max = 256 - (256 % charset.length);
@@ -109,7 +102,6 @@ function SecretTool() {
   );
 }
 
-/* ---------- uuid ---------- */
 
 function genUuid() {
   if (crypto.randomUUID) return crypto.randomUUID();
@@ -133,12 +125,9 @@ function UuidTool() {
   );
 }
 
-/* ---------- cron builder (dkit syntax: "30s", "5m", "2h", "daily 09:30", "mon 09:00") ---------- */
 
 const DAY_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
-// Mirrors parseSchedule in backend/src/jobs.js so the preview matches what the
-// job runner will actually do. Returns epoch ms of the next run, or null.
 function nextRun(schedule, from = new Date()) {
   const s = String(schedule || '').trim().toLowerCase();
   const base = from.getTime();
@@ -267,7 +256,6 @@ function CronTool() {
   );
 }
 
-/* ---------- jwt decoder ---------- */
 
 function b64urlDecode(part) {
   const pad = part.length % 4 === 0 ? '' : '='.repeat(4 - (part.length % 4));
@@ -320,7 +308,6 @@ function JwtTool() {
   );
 }
 
-/* ---------- base64 ---------- */
 
 function utf8ToB64(str) {
   let bin = '';
@@ -365,7 +352,6 @@ function Base64Tool() {
   );
 }
 
-/* ---------- url encoder ---------- */
 
 function UrlTool() {
   const [mode, setMode] = useState('encode');
@@ -398,7 +384,6 @@ function UrlTool() {
   );
 }
 
-/* ---------- sha hash ---------- */
 
 function HashTool() {
   const [text, setText] = useState('');
@@ -440,7 +425,6 @@ function HashTool() {
   );
 }
 
-/* ---------- epoch converter ---------- */
 
 function EpochTool() {
   const [stamp, setStamp] = useState('');
@@ -486,7 +470,6 @@ function EpochTool() {
   );
 }
 
-/* ---------- page ---------- */
 
 export default function Tools({ onNavigate }) {
   return (

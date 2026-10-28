@@ -4,13 +4,6 @@ import AppShell from '../components/app/AppShell';
 import { api } from '../lib/api';
 import './status.css';
 
-// Public status page (dkit.name.ng/status). Reads GET /api/status — no login
-// needed. Auto-refreshes every 30s.
-//
-// Data comes straight from the backend prober:
-//   - services: effective_status = up | down | maintenance (admin override)
-//   - incidents: auto-opened when a service flips down, or posted by an admin;
-//     each carries its update timeline (investigating → identified → …)
 
 const STATUS_META = {
   up: { label: 'operational', Icon: CheckCircle2, cls: 'ok' },
@@ -81,8 +74,6 @@ export default function Status({ onNavigate }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  // Manual refreshes get a short "refreshed ✓" confirmation — the fetch often
-  // finishes in <100ms, which made the button look like it did nothing.
   const [justRefreshed, setJustRefreshed] = useState(false);
   const flashTimer = useRef(null);
   useEffect(() => () => clearTimeout(flashTimer.current), []);
@@ -102,8 +93,6 @@ export default function Status({ onNavigate }) {
     }
     catch (e) { setError(e.message || 'Could not load status.'); }
     finally {
-      // Hold the spinner briefly so the button visibly responds instead of
-      // flashing for a single frame.
       const wait = Math.max(0, 600 - (Date.now() - startedAt));
       setTimeout(() => setRefreshing(false), wait);
     }

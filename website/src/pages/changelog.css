@@ -1,5 +1,3 @@
-/* Changelog — Dashboard visual language */
-
 .changelog-container {
   max-width: 58rem;
   margin: 0 auto;
@@ -63,8 +61,6 @@
   gap: 0.65rem;
   margin-bottom: 0.9rem;
 }
-
-/* Version tags are data-ish — keep mono, drop the green badge treatment. */
 .changelog-version {
   display: inline-flex;
   align-items: center;

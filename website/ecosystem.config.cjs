@@ -1,5 +1,3 @@
-// PM2 ecosystem configuration for dkit-frontend
-// Runs production build and serves static files
 module.exports = {
   apps: [{
     name: 'dkit-frontend',

@@ -2,11 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Bell, RefreshCw, Wrench, ArrowUp, Activity, Plus, Check } from 'lucide-react';
 import { api } from '../../lib/api';
 
-// Admin control room for the public status page. Everything here maps 1:1 to
-// a /api/admin/status/* route:
-//   - services: flip auto / manual_up / manual_down, force a probe
-//   - incidents: post one, post updates, resolve
-//   - notifications: auto-opened incidents the admin hasn't seen yet
 
 const MODES = [
   { id: 'auto', label: 'auto', Icon: Activity, hint: 'prober decides' },
@@ -55,7 +50,7 @@ export default function StatusAdminPanel({ token }) {
     <>
       {error && <p className="auth-error">{error}</p>}
 
-      {/* ---- notifications: auto-opened incidents ---- */}
+      {}
       <div className="dash-card">
         <div className="status-admin-head">
           <h3><Bell width="15" height="15" /> Incident notifications</h3>
@@ -80,7 +75,7 @@ export default function StatusAdminPanel({ token }) {
         </div>
       </div>
 
-      {/* ---- services: mode controls ---- */}
+      {}
       <div className="dash-card">
         <div className="status-admin-head">
           <h3>Services</h3>
@@ -132,7 +127,7 @@ export default function StatusAdminPanel({ token }) {
         </div>
       </div>
 
-      {/* ---- open incidents + updates ---- */}
+      {}
       <div className="dash-card">
         <div className="status-admin-head">
           <h3>Open incidents ({openIncidents.length})</h3>

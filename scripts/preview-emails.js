@@ -1,25 +1,14 @@
-// Render the five transactional emails to files so you can eyeball the design
-// (and the plain-text parts) without sending anything through Resend.
-//
-//   node scripts/preview-emails.js            # writes into scripts/preview/
-//
-// RESEND_API_KEY must exist in backend/.env (email.js refuses to load without
-// it) but nothing is sent — this only renders.
 
 const fs = require('fs')
 const path = require('path')
 
-// email.js refuses to load without RESEND_API_KEY. dotenv isn't resolvable from
-// scripts/, so parse backend/.env by hand (no values are printed or sent).
 try {
   for (const line of fs.readFileSync(path.join(__dirname, '../backend/.env'), 'utf8').split('\n')) {
     const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/)
     if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^['"]|['"]$/g, '')
   }
-} catch { /* no .env — email.js will report the missing var clearly */ }
+} catch {  }
 
-// Intercept the resend module BEFORE email.js loads it, capturing rendered
-// payloads instead of sending. Nothing leaves the machine.
 let captured = null
 const Module = require('module')
 const origLoad = Module._load

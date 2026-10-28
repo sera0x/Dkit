@@ -30,7 +30,7 @@ useEffect(() => {
 const hash = new URLSearchParams(window.location.hash.slice(1));
 const token = hash.get('token');
 let refreshToken = '';
-try { refreshToken = JSON.parse(decodeURIComponent(hash.get('user') || '{}')).refresh_token || ''; } catch { /* no payload */ }
+try { refreshToken = JSON.parse(decodeURIComponent(hash.get('user') || '{}')).refresh_token || ''; } catch {  }
 const finish = async () => {
 if (!token) { onNavigate ? onNavigate('/login') : (window.location.href = '/login'); return; }
 try {
@@ -45,8 +45,6 @@ finish();
 return null;
 }
 const APP_SHELL_PATHS = ['/dashboard', '/docs', '/changelog', '/status', '/tools', '/suspended', '/accept-invite'];
-// Paths with their own screens. Anything else gets the 404 page (which brings
-// its own app shell), instead of silently rendering the homepage.
 const KNOWN_PATHS = ['/', '/login', '/signup', '/forgot-password', '/reset-password', '/oauth/callback', ...APP_SHELL_PATHS];
 function MainContent() {
 const [currentPath, setCurrentPath] = useState(window.location.pathname);
@@ -56,16 +54,12 @@ const handlePopState = () => setCurrentPath(window.location.pathname);
 window.addEventListener('popstate', handlePopState);
 return () => window.removeEventListener('popstate', handlePopState);
 }, []);
-// `path` may carry a query string (/accept-invite?token=…); routing only cares about the pathname
 const navigate = (path) => { window.history.pushState({}, '', path); setCurrentPath(path.split(/[?#]/)[0]); };
 const inviteRedirected = useRef(false);
 useEffect(() => {
 if (currentPath === '/dashboard' && !token) navigate('/login');
 }, [currentPath, token]);
 useEffect(() => {
-// Someone opened an invite link while logged out, then logged in / signed up (both land on /dashboard).
-// Send them back to finish accepting — once per page load, so they can still reach the dashboard
-// (e.g. to verify their email) if accepting needs something first.
 if (currentPath === '/dashboard' && token && !inviteRedirected.current && getPendingInvite()) {
 inviteRedirected.current = true;
 navigate('/accept-invite');
@@ -75,7 +69,6 @@ useEffect(() => nudgeBrowserChrome(), [currentPath]);
 useEffect(() => applySeoMeta(currentPath), [currentPath]);
 const isKnownPath = KNOWN_PATHS.includes(currentPath);
 const isAppShellPage = APP_SHELL_PATHS.includes(currentPath) || !isKnownPath;
-// The homepage has no navbar: its CTAs and footer cover navigation, and it keeps the top of the page clean
 const isHomePage = currentPath === '/';
 const isAuthPage = ['/login', '/signup', '/forgot-password', '/reset-password'].includes(currentPath);
 const renderRoute = () => {

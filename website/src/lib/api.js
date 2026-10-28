@@ -1,10 +1,3 @@
-// API wrapper with transparent session refresh.
-//
-// The backend issues a short-lived JWT (15 min) plus a long-lived refresh
-// token. When a call fails with code `token_expired`, we silently exchange the
-// refresh token for a fresh pair and retry the request once. If the refresh
-// itself fails, the session is truly dead: we clear local state, flag the
-// login page, and bounce to /login.
 
 const STORAGE_KEY = 'dkit_auth';
 const EXPIRED_FLAG = 'dkit_session_expired';
@@ -22,17 +15,15 @@ function readAuth() {
 function writeAuth(auth) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
-  } catch { /* storage unavailable */ }
+  } catch {  }
 }
 
 function notifyAuthChanged() {
   try {
     window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
-  } catch { /* non-browser */ }
+  } catch {  }
 }
 
-// One refresh at a time: concurrent 401s share a single in-flight refresh so
-// token rotation can't be raced into invalidating itself.
 let refreshPromise = null;
 function refreshSession() {
   if (refreshPromise) return refreshPromise;
@@ -64,22 +55,18 @@ function refreshSession() {
   return refreshPromise;
 }
 
-// Session is unrecoverable: wipe local state and send the user to /login with
-// a "session expired" notice. The guard keeps a burst of failing calls from
-// triggering multiple redirects.
 let expiryHandled = false;
 function sessionExpired() {
   if (expiryHandled) return;
   expiryHandled = true;
-  try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
-  try { sessionStorage.setItem(EXPIRED_FLAG, '1'); } catch { /* ignore */ }
+  try { localStorage.removeItem(STORAGE_KEY); } catch {  }
+  try { sessionStorage.setItem(EXPIRED_FLAG, '1'); } catch {  }
   notifyAuthChanged();
   if (!window.location.pathname.startsWith('/login')) {
     window.location.href = '/login';
   }
 }
 
-// Read-and-clear the "session expired" flag the login page shows a notice for.
 export function consumeSessionExpired() {
   try {
     const flagged = sessionStorage.getItem(EXPIRED_FLAG) === '1';
@@ -91,8 +78,6 @@ export function consumeSessionExpired() {
 }
 
 async function request(path, options = {}) {
-  // Tag every browser request with the signed-in email so the server-side
-  // audit trail can distinguish dashboard edits from CLI edits.
   const current = readAuth();
   const res = await fetch(`/api${path}`, {
     ...options,
@@ -107,7 +92,6 @@ async function request(path, options = {}) {
     data = await res.json();
   } catch {
   }
-  // Access token expired mid-session: refresh once and retry with the new one.
   if (res.status === 401 && data?.code === 'token_expired' && !options.__retried) {
     const refreshed = await refreshSession();
     if (refreshed) {
@@ -133,29 +117,17 @@ async function request(path, options = {}) {
 
 const auth = (token) => ({ Authorization: `Bearer ${token}` });
 
-// ---------------------------------------------------------------------------
-// Project calls from the browser go out with the SESSION (Bearer + x-project-id),
-// not an API key. API keys are hashed at rest — the browser never holds one
-// unless the user deliberately saves it below — so this is the only way the
-// dashboard can touch a project's env/store/logs. The backend resolves the
-// project from the session and checks ownership.
-// ---------------------------------------------------------------------------
 const projectAuth = (token, projectId) => ({
   Authorization: `Bearer ${token}`,
   'x-project-id': projectId,
 });
 
-// ---------------------------------------------------------------------------
-// Key vault (localStorage). Reveal/copy of a full API key only works for keys
-// the user has saved into THIS browser (they're shown once server-side, hashed
-// at rest). Anything else shows the masked prefix — honestly.
-// ---------------------------------------------------------------------------
 const VAULT_KEY = 'dkit_key_vault';
 export function readKeyVault() {
   try { return JSON.parse(localStorage.getItem(VAULT_KEY)) || {} } catch { return {} }
 }
 function writeVault(vault) {
-  try { localStorage.setItem(VAULT_KEY, JSON.stringify(vault)) } catch { /* storage unavailable */ }
+  try { localStorage.setItem(VAULT_KEY, JSON.stringify(vault)) } catch {  }
 }
 export function saveKeyToVault(projectId, apiKey) {
   if (!projectId || !apiKey) return;
@@ -240,7 +212,6 @@ deleteProject: (token, id) =>
 request(`/projects/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }),
 rotateProjectKey: (token, id) =>
 request(`/projects/${id}/rotate-key`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }),
-// On-demand API keys: issue (keyless projects only) / revoke (project goes keyless)
 createProjectApiKey: (token, id) =>
 request(`/projects/${id}/api-key`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }),
 revokeProjectApiKey: (token, id) =>
@@ -262,7 +233,6 @@ Authorization: `Bearer ${token}`,
 ...(refreshToken ? { 'x-session-token': refreshToken } : {}),
 },
 }),
-// Project-scoped routes (env, store) — session-authenticated.
 projectEnv: (token, projectId, environment) =>
 request(environment ? `/env?environment=${encodeURIComponent(environment)}` : '/env', {
 headers: projectAuth(token, projectId),
@@ -313,8 +283,6 @@ headers: projectAuth(token, projectId),
 body: JSON.stringify({ vars, environment }),
 }),
 
-// Verify a candidate API key for a project (no storage server-side; the key
-// lives in the browser's vault only if it matches).
 verifyProjectKey: (token, projectId, key) =>
 request(`/projects/${projectId}/verify-key`, {
 method: 'POST',
@@ -323,10 +291,8 @@ body: JSON.stringify({ key }),
 }),
 getOverview: (token) => request('/overview', { headers: auth(token) }),
 
-// Public status page (no auth)
 getStatus: () => request('/status'),
 
-// Admin: status page controls + notification feed
 getAdminStatus: (token) => request('/admin/status', { headers: auth(token) }),
 setServiceMode: (token, id, mode) =>
   request(`/admin/status/services/${id}/mode`, { method: 'POST', headers: auth(token), body: JSON.stringify({ mode }) }),
@@ -339,7 +305,6 @@ addIncidentUpdate: (token, id, update) =>
 ackStatusNotifications: (token) =>
   request('/admin/status/ack', { method: 'POST', headers: auth(token) }),
 
-// Cron
 cronList: (token, projectId) => request(`/projects/${projectId}/cron`, { headers: auth(token) }),
 cronCreate: (token, projectId, job) =>
 request(`/projects/${projectId}/cron`, { method: 'POST', headers: auth(token), body: JSON.stringify(job) }),
@@ -351,7 +316,6 @@ cronRun: (token, projectId, jobId) =>
 request(`/projects/${projectId}/cron/${jobId}/run`, { method: 'POST', headers: auth(token) }),
 cronRuns: (token, projectId, jobId) => request(`/projects/${projectId}/cron/${jobId}/runs`, { headers: auth(token) }),
 
-// Uptime monitors
 monitorList: (token, projectId) => request(`/projects/${projectId}/monitors`, { headers: auth(token) }),
 monitorCreate: (token, projectId, monitor) =>
 request(`/projects/${projectId}/monitors`, { method: 'POST', headers: auth(token), body: JSON.stringify(monitor) }),
@@ -362,7 +326,6 @@ request(`/projects/${projectId}/monitors/${monitorId}`, { method: 'DELETE', head
 monitorChecks: (token, projectId, monitorId) =>
 request(`/projects/${projectId}/monitors/${monitorId}/checks`, { headers: auth(token) }),
 
-// Logs
 logsList: (token, projectId, { level, search, before } = {}) => {
   const qs = new URLSearchParams();
   if (level) qs.set('level', level);

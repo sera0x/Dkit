@@ -1,6 +1,4 @@
 
-/* Marketing theme toggle (MarketingShell): fixed bottom-right so it never
-   collides with the floating brand / login buttons at the top of the hero. */
 .marketing-theme-btn {
   position: fixed;
   bottom: 1.25rem;
@@ -11,7 +9,6 @@
 
 .hero-section {
   position: relative;
-  /* No navbar above the hero any more, so it fills the whole first screen */
   min-height: 100vh;
   min-height: 100svh;
   display: flex;
@@ -64,10 +61,6 @@
 @keyframes blink {
   50% { opacity: 0; }
 }
-
-/* One orchestrated hero load sequence (house recipe: rise + fade + 2px blur,
-   transitions.dev tokens). The Shuffle headline is the anchor moment and does
-   not move; everything after it takes one 80ms beat at a time. */
 .hero-seq > *:not(:first-child) {
   animation: heroRise var(--duration-slow) var(--ease-smooth-out) backwards;
 }
@@ -161,13 +154,6 @@
 .hero-terminal-wrap .terminal-window {
   box-shadow: 0 20px 60px -20px rgba(0, 0, 0, 0.6);
 }
-
-/* Light-mode fixes for marketing components that hardcode dark assumptions.
-   The orb takes care of light backgrounds itself: same shader, white backdrop,
-   it mixes its own light-color path. The glow wrapper only gets a small
-   opacity bump so the green tint stays readable on white. The CTA gets white
-   text on the darker green, like the dashboard's light buttons, and flips its
-   hover to the dimmer green. */
 .marketing-shell[data-theme='light'] .cta-button {
   color: #ffffff;
 }
@@ -350,11 +336,6 @@
   font-weight: 700;
   margin: 0 0 2.5rem;
 }
-
-/* The Terminal component draws its own window (black in both themes), so only
-   alignment and type come from here. This rule used to restyle the window with
-   a themed background, which painted it light gray in light mode while the
-   terminal text stayed near-white: invisible demo. */
 .terminal-content .terminal-window {
   text-align: left;
   font-family: var(--font-mono);
@@ -445,9 +426,6 @@
   padding-top: 1.5rem;
   border-top: 1px solid var(--border);
 }
-
-
-/* ===== Homepage navbar: match dashboard topbar look ===== */
 .navbar {
   position: sticky;
   top: 0;
@@ -465,8 +443,6 @@
   padding: 0.75rem 1rem;
   gap: 1rem;
 }
-
-/* ===== Navbar: dashboard topbar style ===== */
 .navbar {
   position: sticky;
   top: 0;
@@ -504,8 +480,6 @@
   padding: 0.5rem 1rem;
   font-size: 0.82rem;
 }
-
-/* theme-aware icon buttons (ported from dashboard) */
 .icon-btn {
   display: inline-grid;
   place-items: center;
@@ -534,8 +508,6 @@
 .icon-btn.accent:hover {
   background: rgba(57, 255, 136, 0.2);
 }
-
-/* drawer links (replacing old anchor links) */
 .navbar-link {
   display: block;
   width: 100%;
@@ -553,8 +525,6 @@
 .navbar-link:hover {
   color: var(--accent);
 }
-
-/* dashboard-style drawer */
 .navbar-drawer {
   position: fixed;
   top: 0;
@@ -622,8 +592,6 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
-
-/* ===== Navbar (dashboard topbar style) ===== */
 .navbar {
   position: sticky;
   top: 0;
@@ -689,8 +657,6 @@
   border-color: var(--border-strong);
   background: var(--surface-raised);
 }
-
-/* drawer */
 .navbar-backdrop {
   position: fixed;
   inset: 0;
@@ -783,9 +749,6 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
-
-/* Close is quicker than open (open/close asymmetry): the drawer exits the way
-   it came in, but at quick speed instead of fast. */
 .navbar-drawer.is-closing {
   animation: navbarSlideOut var(--duration-quick) var(--ease-smooth-out) forwards;
 }
@@ -801,8 +764,6 @@
 @keyframes navbarFadeOut {
   to { opacity: 0; }
 }
-
-/* Login / dashboard button floating top-right of the hero, no bar behind it */
 .hero-section {
   min-height: 100vh;
   min-height: 100svh;
@@ -816,6 +777,4 @@
   padding: 0.5rem 1rem;
   font-size: 0.82rem;
 }
-
-/* Logo + name, top-left, mirroring the login/dashboard button on the right */
 .hero-brand-btn { position: absolute; top: max(1rem, env(safe-area-inset-top)); left: 1rem; z-index: 5; height: 2.4rem; }

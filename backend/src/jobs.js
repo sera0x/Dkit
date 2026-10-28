@@ -1,30 +1,11 @@
-// Background worker for Dkit's runtime features. Started by server.js after
-// the DB is ready. Everything here is best-effort: a failing probe or job run
-// is recorded, never thrown — the API keeps serving while this loops.
-//
-//   - Cron: claims due cron_jobs rows, fires the configured HTTP call, records
-//     the result in cron_runs, and schedules the next run.
-//   - Monitors: probes every due monitor, tracks up/down state, and emails the
-//     project owner on state flips (after 2 consecutive failures).
-//   - Logs: hourly cleanup of log entries older than 7 days.
-//   - Media: temp uploads past their TTL lose their bucket object and row.
-//
-// Uses global fetch (Node >= 18) — the same runtime Resend already requires.
 
 const { pool } = require('./db')
 const r2 = require('./r2')
 const { sendUptimeAlertEmail } = require('./email')
 
-const TICK_MS = 30 * 1000        // how often we look for due work
-const RETENTION_DAYS = 7         // log_entries older than this are deleted
+const TICK_MS = 30 * 1000
+const RETENTION_DAYS = 7
 
-// ---------------------------------------------------------------------------
-// Cron schedule parsing. Three human formats, all evaluated in UTC:
-//   "5m" / "30s" / "2h"        — every interval
-//   "daily 09:30"              — once a day at 09:30 UTC
-//   "mon 09:00" (mon..sun)     — once a week at that day/time UTC
-// Returns the epoch-ms of the NEXT run strictly after `from`, or null.
-// ---------------------------------------------------------------------------
 const DAY_NAMES = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 }
 
 function parseSchedule(schedule, from = new Date()) {
@@ -34,11 +15,9 @@ function parseSchedule(schedule, from = new Date()) {
   const interval = s.match(/^(\d+)\s*(s|sec|second|seconds|m|min|minute|minutes|h|hr|hour|hours)$/)
   if (interval) {
     const n = Number(interval[1])
-    const unit = interval[2][0] // s / m / h
+    const unit = interval[2][0]
     const ms = unit === 's' ? n * 1000 : unit === 'm' ? n * 60 * 1000 : n * 3600 * 1000
-    if (ms < 10 * 1000) return null // floor: don't let a typo DDoS anyone
-    // Next multiple-of-interval after `from`, computed from the epoch so the
-    // phase is stable across restarts.
+    if (ms < 10 * 1000) return null
     return Math.floor(base / ms) * ms + ms
   }
 
@@ -69,7 +48,6 @@ function parseSchedule(schedule, from = new Date()) {
   return null
 }
 
-// First run: due immediately when a job is created or enabled.
 function firstRunAt(schedule) {
   return parseSchedule(schedule, new Date(Date.now() - 1000))
 }
@@ -79,17 +57,11 @@ function describeSchedule(schedule) {
   return next ? new Date(next).toISOString() : null
 }
 
-// ---------------------------------------------------------------------------
-// Cron execution. executeCronJob is shared by the background ticker and the
-// POST /api/cron/:id/run "run now" route in server.js.
-// ---------------------------------------------------------------------------
 async function executeCronJob(job) {
   const started = Date.now()
   let statusCode = null
   let errorText = null
   try {
-    // Custom headers win: only add the JSON content type when the job didn't
-    // define one (case-insensitive check), so a job can send form data etc.
     const custom = (typeof job.headers === 'object' && job.headers) || {}
     const hasCT = Object.keys(custom).some((k) => k.toLowerCase() === 'content-type')
     const res = await fetch(job.url, {
@@ -103,7 +75,6 @@ async function executeCronJob(job) {
     })
     statusCode = res.status
     if (!res.ok) errorText = 'HTTP ' + res.status
-    // Drain the body so the socket is released even on huge responses.
     await res.arrayBuffer().catch(() => {})
   } catch (err) {
     errorText = String(err?.cause?.message || err.message || err).slice(0, 300)
@@ -137,7 +108,6 @@ async function runDueCronJobs() {
 }
 
 async function pruneCronRuns() {
-  // Keep the run table bounded: 200 runs per job is plenty of history.
   await pool.query(`
     DELETE FROM cron_runs cr WHERE (
       SELECT COUNT(*) FROM cron_runs cr2
@@ -145,9 +115,6 @@ async function pruneCronRuns() {
     ) > 200`).catch(() => {})
 }
 
-// ---------------------------------------------------------------------------
-// Uptime monitors
-// ---------------------------------------------------------------------------
 async function probeMonitor(m) {
   const started = Date.now()
   let statusCode = null
@@ -167,14 +134,12 @@ async function probeMonitor(m) {
   const ok = !errorText
   const latency = Date.now() - started
 
-  // State machine: 'down' after 2 consecutive failures, 'up' again on the
-  // first success. Emails fire on flips, not on every failed check.
   const prevStatus = m.status
   const failures = ok ? 0 : (m.consecutive_failures || 0) + 1
   let status = prevStatus
   if (ok) status = 'up'
   else if (failures >= 2) status = 'down'
-  else if (prevStatus === 'pending') status = 'down' // a failed first check counts as down
+  else if (prevStatus === 'pending') status = 'down'
 
   await pool.query(
     `UPDATE monitors SET last_checked_at = NOW(), last_status_code = $2, last_latency_ms = $3,
@@ -216,25 +181,13 @@ async function runDueMonitors() {
   return due.rows.length
 }
 
-// Freshly-inserted monitors (from SQL or older code) may have no next probe
-// scheduled; nothing to do here because probes are keyed off last_checked_at.
-// Kept as a no-op for symmetry with the cron scheduler.
 async function scheduleMonitors() {}
 
-// ---------------------------------------------------------------------------
-// Log retention
-// ---------------------------------------------------------------------------
 async function pruneLogs() {
   const r = await pool.query(`DELETE FROM log_entries WHERE ts < NOW() - ($1 || ' days')::interval`, [RETENTION_DAYS])
   return r.rowCount
 }
 
-// ---------------------------------------------------------------------------
-// Media retention: expired temp uploads are swept here within a tick. The
-// bucket object is deleted first; only then is the row marked deleted, so a
-// crash between the two just retries (a marked row with no object is harmless,
-// the reverse keeps paying for bytes nobody can reach — those never happen).
-// ---------------------------------------------------------------------------
 async function sweepMediaExpiry() {
   if (!r2.configured()) return 0
   const due = await pool.query(
@@ -255,10 +208,6 @@ async function sweepMediaExpiry() {
   return swept
 }
 
-// ---------------------------------------------------------------------------
-// Main loop. `busy` keeps overlapping ticks from piling up when the network
-// is slow — a slow batch of probes just delays the next tick.
-// ---------------------------------------------------------------------------
 function startJobs() {
   let busy = false
   let lastLogPrune = 0

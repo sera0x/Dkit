@@ -1,5 +1,3 @@
-// {{Name}} — zero-dependency Node HTTP API.
-// Secrets arrive as environment variables via `dkit run` — nothing touches disk.
 const http = require('http')
 const { log } = require('./dkit-logger')
 

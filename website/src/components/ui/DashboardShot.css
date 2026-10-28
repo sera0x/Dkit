@@ -1,7 +1,3 @@
-/* Hero dashboard mock: static, token-driven, deliberately quiet. No shadows
-   with baked-in darkness, no glow, no gradients; contrast comes from borders
-   and surfaces so it reads in both themes. Mirrors the dashboard's geometry:
-   sidebar, section header, then bordered cards. */
 .dshot {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -27,8 +23,6 @@
   border-radius: 50%;
   opacity: 0.9;
 }
-
-/* mac window traffic lights: close / minimize / zoom */
 .dshot-dot:nth-of-type(1) { background: #ff5f57; }
 .dshot-dot:nth-of-type(2) { background: #febc2e; }
 .dshot-dot:nth-of-type(3) { background: #28c840; }

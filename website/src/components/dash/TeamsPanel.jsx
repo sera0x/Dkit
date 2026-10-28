@@ -12,12 +12,6 @@ const daysLeft = (iso) => Math.max(0, Math.ceil((new Date(iso) - Date.now()) / 8
 
 const RoleChip = ({ role }) => <span className={'team-role team-role-' + role}>{role}</span>;
 
-// Teams tab for the dashboard.
-//   invites          – pending invitations addressed to the signed-in account (owned by Dashboard so the nav badge can use them)
-//   projects         – the signed-in user's own projects (owners/admins can share one of them into the team)
-//   onInvitesChange  – call after accepting/declining so Dashboard refreshes that list
-//   onOpenProject    – (id) => opens the project in Secrets; passed for every project the
-//                      signed-in account can actually open (own or team-shared)
 export default function TeamsPanel({ token, user, invites = [], projects = [], onInvitesChange, onOpenProject }) {
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +30,7 @@ export default function TeamsPanel({ token, user, invites = [], projects = [], o
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState('');
   const [confirmTag, setConfirmTag] = useState('');
-  const [confirmDeleteTeam, setConfirmDeleteTeam] = useState(false); // type-to-confirm banner (owner delete only)
+  const [confirmDeleteTeam, setConfirmDeleteTeam] = useState(false);
   useEffect(() => {
     if (!confirmDeleteTeam) return;
     const onKey = (e) => { if (e.key === 'Escape') setConfirmDeleteTeam(false); };
@@ -208,9 +202,6 @@ export default function TeamsPanel({ token, user, invites = [], projects = [], o
     });
   };
 
-  // Copy the shared project's key from THIS browser's vault when we have it
-  // (owner after create/rotate, anyone who pasted it once). Never claim to
-  // copy the useless prefix — if the key isn't in the vault, say so instead.
   const copySharedKey = (p) => {
     const key = vault.read()[p.id];
     if (!key) return;
@@ -226,7 +217,6 @@ export default function TeamsPanel({ token, user, invites = [], projects = [], o
     </>
   );
 
-  /* ---------------- Team detail ---------------- */
   if (openId) {
     const role = detail?.role;
     const canManage = role === 'owner' || role === 'admin';
@@ -464,7 +454,6 @@ export default function TeamsPanel({ token, user, invites = [], projects = [], o
     );
   }
 
-  /* ---------------- Team list ---------------- */
   return (
     <>
       {messages}

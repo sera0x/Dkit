@@ -1,9 +1,6 @@
-// Placeholder engine + atomic renderer for the Dkit scaffolder.
-// Templates are text-only by convention; binary assets are not supported.
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
-// Single-pass alternation: a replacement can never be re-substituted.
 const PLACEHOLDER = /{{(name|Name|name_snake|NAME)}}/g
 function renderText(text, names) {
   return text.replace(PLACEHOLDER, (m, key) => (key in names ? names[key] : m))
@@ -15,7 +12,7 @@ function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) walk(full, out)
-    else out.push(full) // symlinks treated as files, never followed as dirs
+    else out.push(full)
   }
   return out
 }
@@ -25,8 +22,6 @@ function scaffold({ templateDir, targetDir, names }) {
   }
   const parent = path.dirname(targetDir)
   fs.mkdirSync(parent, { recursive: true })
-  // Temp dir lives INSIDE the target's parent: same filesystem, so the
-  // final rename is atomic. A crash mid-render leaves no partial project.
   const tmpDir = path.join(parent, '.' + path.basename(targetDir) + '.tmp-' + crypto.randomBytes(4).toString('hex'))
   fs.mkdirSync(tmpDir)
   try {

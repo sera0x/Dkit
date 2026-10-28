@@ -6,18 +6,7 @@ import { applyChromeTheme, syncChrome, nudgeBrowserChrome } from '../../lib/brow
 import '../../pages/dashboard.css';
 import '../../pages/render-look.css';
 
-// Shared chrome for every "app" page — Dashboard, Docs, Changelog — so the
-// three share one navbar, one theme toggle, and one visual language.
-//
-// The theme is applied via the `data-theme` attribute on this component's own
-// root element (.dash-shell), not on <html>. CSS variables set there only
-// cascade to what's inside this shell, so toggling light mode here can never
-// leak out to the marketing site (home, login, signup), which always stays
-// on its own fixed dark look.
 
-// The browser's status bar / overscroll area is kept in step with this shell's theme by
-// lib/browserChrome (theme-color meta + <html> background). It is set here, and handed back
-// to the marketing site's dark default the moment the shell unmounts.
 
 export default function AppShell({ active, onNavigate, primaryNav, children }) {
   const { user, logout } = useAuth();
@@ -30,24 +19,18 @@ export default function AppShell({ active, onNavigate, primaryNav, children }) {
   });
 
   useEffect(() => {
-    try { localStorage.setItem('dkit_theme', theme); } catch { /* storage unavailable */ }
+    try { localStorage.setItem('dkit_theme', theme); } catch {  }
   }, [theme]);
 
-  // Layout effect: runs before paint, so the very first frame already has the right
-  // status-bar color instead of flashing the dark marketing one.
   useLayoutEffect(() => { applyChromeTheme(theme); }, [theme]);
   useLayoutEffect(() => () => applyChromeTheme('dark'), []);
 
-  // Same mount-time realignment as MarketingShell: adopt the restored chrome,
-  // then nudge Safari to resample — its bars never re-read on meta/DOM edits.
   useLayoutEffect(() => {
     syncChrome();
     const cancel = nudgeBrowserChrome({ keepPosition: true });
     return cancel;
   }, []);
 
-  // Safari re-tints its bars at scroll/toolbar moments, not on DOM changes — nudge it after a
-  // theme switch. (Route changes are already nudged in App.jsx, so skip the first run.)
   const firstRun = useRef(true);
   useEffect(() => {
     if (firstRun.current) { firstRun.current = false; return undefined; }
@@ -56,9 +39,6 @@ export default function AppShell({ active, onNavigate, primaryNav, children }) {
 
   const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
 
-  // Mobile drawer close = animate out first (150ms), unmount after. Reopening
-  // mid-close cancels the timer and remounts (new key) so the open animation
-  // plays again.
   const closeDrawer = () => {
     if (drawerTimer.current) return;
     setDrawerClosing(true);
@@ -100,7 +80,6 @@ export default function AppShell({ active, onNavigate, primaryNav, children }) {
   );
 
   const nav = (
-    // Clicking any nav item — workspace or quick link — closes the mobile drawer.
     <nav className="dash-nav" onClick={() => closeDrawer()}>
       {primaryNav && (
         <>

@@ -1,5 +1,3 @@
-/* Docs — Dashboard visual language */
-
 .docs-container {
   max-width: 58rem;
   margin: 0 auto;
@@ -150,8 +148,6 @@
   color: var(--text-muted);
   background: var(--surface-raised);
 }
-
-/* CLI commands are data — mono stays; neutral text color instead of green. */
 .docs-table td:first-child {
   font-family: var(--font-mono);
   white-space: nowrap;

@@ -1,8 +1,5 @@
 import { Component } from 'react';
 
-// Catches render/lifecycle errors anywhere below it in the tree. Without
-// this, an uncaught error in any one component (e.g. a WebGL failure)
-// unmounts the entire app, leaving a blank page with no visible cause.
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);

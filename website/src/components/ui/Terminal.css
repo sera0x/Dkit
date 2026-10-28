@@ -33,10 +33,6 @@
 .terminal-dot-green {
   background: #27c93f;
 }
-
-/* The titlebar stays black in both themes, so the label keeps a fixed light
-   color. The themed --text-muted turns dark gray in light mode and vanishes
-   against the black bar. */
 .terminal-titlebar-label {
   margin-left: 0.5rem;
   font-size: 0.75rem;

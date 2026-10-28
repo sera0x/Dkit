@@ -1,7 +1,3 @@
-/* ============ Dkit Dashboard ============ */
-
-/* Keyboard focus is visible everywhere in the shell — one floor for the whole
-   app, legacy Overview included (render-look's narrower rule stays for its own scope). */
 .dash-shell button:focus-visible,
 .dash-shell a:focus-visible,
 .dash-shell [tabindex]:focus-visible,
@@ -16,19 +12,11 @@
   min-height: 100vh;
   display: flex;
   overflow-x: hidden;
-  /* Inherited text color must resolve HERE, inside the shell. Without this,
-     children inherit the color computed on <body> — which uses the dark-theme
-     --text, because the light-mode variable overrides live on .dash-shell
-     itself. Elements without their own color rule (form titles, headings in
-     docs/changelog, <em>/<strong> in copy) then render near-white on the
-     white light-mode background. */
   color: var(--text);
   background:
     radial-gradient(40rem 30rem at 110% -10%, var(--accent-soft), transparent 60%),
     var(--bg);
 }
-
-/* ---------- Sidebar ---------- */
 
 .dash-side {
   position: sticky;
@@ -111,9 +99,6 @@
   border: none;
   border-top: 1px solid var(--border);
 }
-
-/* Sidebar group labels: small and gray in the UI sans — restrained, not
-   tracked-out ALL-CAPS mono (see dkit-style-guide.md, structural devices). */
 .dash-side-chip {
   margin: 0.1rem 0.4rem;
   font-size: 0.78rem;
@@ -229,8 +214,6 @@
   border-color: var(--border-strong);
 }
 
-/* ---------- Mobile topbar ---------- */
-
 .dash-topbar {
   display: none;
 }
@@ -239,8 +222,6 @@
   padding: 0.5rem 0.9rem;
   font-size: 0.82rem;
 }
-
-/* ---------- Main area ---------- */
 
 .dash-main {
   flex: 1;
@@ -260,8 +241,6 @@
 .dash-shell[data-theme='light'] .dash-topbar {
   background: rgba(255, 255, 255, 0.85);
 }
-
-/* ---------- Verify banner ---------- */
 
 .verify-banner {
   display: flex;
@@ -310,8 +289,6 @@
 .verify-banner-body .auth-error {
   margin-top: 0.5rem;
 }
-
-/* ---------- Stat cards ---------- */
 
 .dash-stats {
   display: grid;
@@ -383,8 +360,6 @@
   100% { background-position: -200% 0; }
 }
 
-/* ---------- Generic cards ---------- */
-
 .dash-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -403,8 +378,6 @@
   margin: 0 0 1rem;
   color: var(--text);
 }
-
-/* ---------- Run strips ---------- */
 
 .run-strip {
   display: flex;
@@ -428,8 +401,6 @@
   overflow-x: auto;
   white-space: nowrap;
 }
-
-/* ---------- Icon buttons ---------- */
 
 .icon-btn {
   display: inline-grid;
@@ -488,8 +459,6 @@
   background: #ff8080;
 }
 
-/* ---------- Secrets picker / table ---------- */
-
 .project-picker {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
@@ -542,9 +511,6 @@
   color: var(--text);
   border-color: var(--border-strong);
 }
-
-/* Environment chip: a neutral label — the environment name isn't a success
-   state, so it doesn't get the brand green. */
 .env-chip {
   display: inline-flex;
   align-items: center;
@@ -631,8 +597,6 @@
   gap: 1rem;
   padding: 0.65rem 1.1rem;
 }
-
-/* Table headers: small gray sans, sentence case — readable, not shouted. */
 .secrets-head {
   font-size: 0.78rem;
   font-weight: 600;
@@ -684,8 +648,6 @@
   gap: 0.35rem;
 }
 
-/* ---------- Add row ---------- */
-
 .kv-add-row {
   display: grid;
   grid-template-columns: minmax(9rem, 0.9fr) minmax(10rem, 1.4fr) auto;
@@ -712,8 +674,6 @@
   font-size: 0.85rem;
 }
 
-/* ---------- Store rows ---------- */
-
 .store-table {
   display: flex;
   flex-direction: column;
@@ -734,7 +694,6 @@
 }
 
 .store-row.cron-row {
-  /* rows that carry a status pill (cron) or an error strip (monitors) can wrap */
   grid-template-columns: minmax(9rem, 1fr) minmax(9rem, 1fr) auto;
 }
 
@@ -758,8 +717,6 @@
 .store-row:hover {
   background: var(--surface-raised);
 }
-
-/* Store keys/values are data — mono stays. */
 .store-key {
   font-family: var(--font-mono);
   font-size: 0.85rem;
@@ -834,8 +791,6 @@
   text-align: right;
 }
 
-/* ---------- Projects ---------- */
-
 .new-project-form {
   display: flex;
   gap: 0.6rem;
@@ -901,8 +856,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-/* Small neutral chip marking a team-shared project in the projects list */
 .shared-chip {
   font-size: 0.68rem;
   color: var(--text-muted);
@@ -911,8 +864,6 @@
   padding: 0.05rem 0.45rem;
   white-space: nowrap;
 }
-
-/* Team containers group shared projects above the personal project list */
 .project-group {
   display: flex;
   flex-direction: column;
@@ -939,8 +890,6 @@
   border-radius: 999px;
   padding: 0 0.4rem;
 }
-
-/* Sidebar project list — pick once, every section follows */
 .project-picker-side {
   display: flex;
   flex-direction: column;
@@ -984,8 +933,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-/* Admin broadcast mail */
 .broadcast-form {
   display: flex;
   flex-direction: column;
@@ -1004,8 +951,6 @@
   align-items: center;
   gap: 0.75rem;
 }
-
-/* Paste-in .env import (Secrets) */
 .env-import {
   margin-bottom: 1rem;
   border: 1px solid var(--border);
@@ -1027,8 +972,6 @@
   align-items: center;
   gap: 0.6rem;
 }
-
-/* Panel add-forms: a quiet card with aligned rows instead of one cramped grid */
 .panel-form {
   margin-top: 1rem;
   border: 1px solid var(--border);
@@ -1056,10 +999,6 @@
   display: flex;
   justify-content: flex-end;
 }
-
-/* Dashboard buttons are product UI, not marketing CTAs — the big mono
-   .cta-button base comes from the marketing stylesheet and is overridden
-   here, scoped to the app shell. */
 .dash-shell .cta-button {
   font-family: var(--font-sans);
   font-size: 0.85rem;
@@ -1075,8 +1014,6 @@
   padding: 0.4rem 0.8rem;
   font-size: 0.8rem;
 }
-
-/* ---------- Empty states ---------- */
 
 .empty-state {
   display: flex;
@@ -1099,12 +1036,6 @@
   margin: 0;
   font-size: 0.9rem;
 }
-
-/* ---------- Shared inputs ---------- */
-
-/* Inputs: sans by default — typed *values* read fine either way, and the
-   mono-everywhere input look was part of the terminal-cosplay problem.
-   Exception below for inputs that hold real code/data. */
 .dash-main input[type='text'],
 .dash-main input[type='email'],
 .dash-main input[type='number'],
@@ -1118,8 +1049,6 @@
   color: var(--text);
   transition: border-color var(--duration-quick) var(--ease-out), box-shadow var(--duration-quick) var(--ease-out);
 }
-
-/* Key/value inputs hold actual identifiers and JSON — mono is correct there. */
 .kv-add-row input, .kv-add-row textarea { font-family: var(--font-mono); }
 
 .dash-main input:focus,
@@ -1135,8 +1064,6 @@
   opacity: 1;
 }
 
-/* ---------- Buttons ---------- */
-
 .dash-main .cta-button {
   padding: 0.7rem 1.3rem;
   font-size: 0.88rem;
@@ -1146,9 +1073,6 @@
   font-size: 0.88rem;
   padding: 0.7rem 1.3rem;
 }
-
-/* Ghost = quiet outline button. (This class was used but never styled, so all
-   ghost buttons fell through to solid green — the "everything is green" bug.) */
 .dash-main .cta-button.ghost {
   background: transparent;
   border: 1px solid var(--border-strong);
@@ -1159,8 +1083,6 @@
   background: var(--surface-raised);
   transform: none;
 }
-
-/* ---------- Desktop / mobile layout ---------- */
 
 @media (max-width: 54rem) {
   .dash-shell {
@@ -1223,8 +1145,6 @@
   .stat-num {
     font-size: 1.75rem;
   }
-
-  /* Secrets: turn each row into a stacked card so values stay visible */
   .secrets-table {
     border: none;
     background: transparent;
@@ -1282,8 +1202,6 @@
     width: 100%;
     text-align: left;
   }
-
-  /* Store: stacked cards, meta stays visible */
   .store-table {
     border: none;
     background: transparent;
@@ -1332,8 +1250,6 @@
     margin: 0 -0.95rem -0.85rem;
     border-radius: 0 0 10px 10px;
   }
-
-  /* Projects: keep the API key visible, wrapped */
   .project-row {
     grid-template-columns: auto 1fr auto;
     grid-template-areas:
@@ -1383,8 +1299,6 @@
     flex: 1 1 6rem;
   }
 }
-
-/* ---------- Mobile drawer ---------- */
 
 .dash-backdrop {
   position: fixed;
@@ -1444,9 +1358,6 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
-
-/* Drawer enters like a panel: short travel + fade + 2px cross-blur
-   (transitions.dev panel-reveal, X-axis, tokenized) */
 @keyframes dkDrawerIn {
   from {
     transform: translateX(calc(-1 * var(--distance-base)));
@@ -1459,9 +1370,6 @@
     filter: blur(0);
   }
 }
-
-/* Close mirrors the enter, but at quick speed instead of fast
-   (open/close asymmetry). */
 .dash-drawer.is-closing {
   animation: dkDrawerOut var(--duration-quick) var(--ease-smooth-out) forwards;
 }
@@ -1481,9 +1389,6 @@
 @keyframes fadeOut {
   to { opacity: 0; }
 }
-
-/* Section drill-in: content slides in from the right with a soft blur
-   (transitions.dev page-slide, enter-only, tokenized) */
 .dash-section {
   animation: dkSectionIn var(--duration-fast) var(--ease-smooth-out);
 }
@@ -1508,7 +1413,6 @@
     animation: none !important;
   }
 }
-/* ===== Mobile polish: cap content width, compact stats ===== */
 @media (max-width: 54rem) {
   .dash-main {
     max-width: 42rem;
@@ -1531,8 +1435,6 @@
     font-size: 0.85rem;
   }
 }
-
-/* ===== Metric explorer (Dashboard 10 style) ===== */
 .metric-explorer { margin-bottom: 1rem; }
 .me-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .me-total { font-size: 0.82rem; color: var(--text-muted); }
@@ -1557,15 +1459,13 @@
 .me-pt { stroke: var(--surface); stroke-width: 2; }
 .me-tip {
   position: absolute; top: 0; transform: translateX(-50%);
-  font-family: var(--font-mono); font-size: 0.72rem; /* tooltip shows values — data */
+  font-family: var(--font-mono); font-size: 0.72rem;
   background: var(--surface-raised); border: 1px solid var(--border);
   border-radius: 7px; padding: 0.3rem 0.55rem; pointer-events: none;
   white-space: nowrap;
 }
 .me-tip span { color: var(--text-muted); margin-left: 0.4rem; }
 .me-xlabels { display: flex; justify-content: space-between; font-size: 0.72rem; font-variant-numeric: tabular-nums; color: var(--text-muted); padding: 0.3rem 0.2rem 0; }
-
-/* ===== Activity heatmap (Analytics 9 style) ===== */
 .heatmap-card { margin-bottom: 1rem; }
 .hm-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .hm-total { font-size: 0.82rem; color: var(--text-muted); }
@@ -1598,14 +1498,9 @@
   .me-tab { font-size: 0.72rem; padding: 0.3rem 0.65rem; }
   .hm-grid-wrap { overflow-x: auto; }
 }
-
-/* ===== Desktop polish for explorer + heatmap ===== */
 @media (min-width: 54rem) {
   .metric-explorer, .heatmap-card { max-width: 58rem; }
   .me-chart { max-height: 300px; }
-
-  /* fluid heatmap cells: grow with the card instead of staying pinned at
-     12px and left-aligned on a wide viewport */
   .hm-grid {
     grid-template-rows: repeat(7, minmax(12px, 1fr));
     grid-auto-columns: minmax(12px, 1fr);
@@ -1621,17 +1516,11 @@
   .hm-grid-wrap { overflow-x: visible; }
 }
 
-/* ===== Admin panel ===== */
-
 .ip-cluster { padding: 0.8rem 0; border-bottom: 1px solid var(--border); }
 .ip-cluster:last-child { border-bottom: none; }
-/* IPs and emails are data — mono is correct. */
 .ip-cluster-head { display: flex; justify-content: space-between; gap: 1rem; font-family: var(--font-mono); font-size: 0.82rem; }
 .ip-cluster-head span { color: var(--text-muted); }
 .ip-cluster-emails { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem; word-break: break-all; }
-
-
-/* Suspended account page */
 .suspended-wrap {
   min-height: 100vh;
   display: grid;
@@ -1668,8 +1557,6 @@
   color: var(--text-muted);
   line-height: 1.5;
 }
-
-/* Admin table: mobile-friendly cards */
 @media (max-width: 720px) {
   .admin-table .secrets-row {
     grid-template-columns: 1fr !important;
@@ -1709,8 +1596,6 @@
     margin-top: 0.35rem;
   }
 }
-
-/* Status badges */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -1732,9 +1617,6 @@
   border-color: rgba(255, 176, 32, 0.35);
   background: rgba(255, 176, 32, 0.10);
 }
-
-
-/* ===== Admin: stat pills + user cards ===== */
 .admin-stats { margin-bottom: 1rem; }
 @media (min-width: 54rem) {
   .admin-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -1775,8 +1657,6 @@
   font-weight: 600; font-size: 0.95rem;
 }
 .admin-user-info { flex: 1; min-width: 0; }
-/* Email addresses are data, but the mono here made the whole admin list read
-   as a terminal dump — emails work fine in sans, keep weight for scanning. */
 .admin-user-email {
   font-size: 0.9rem; font-weight: 600;
   color: var(--text); word-break: break-all;
@@ -1806,8 +1686,6 @@
 .admin-confirm p { margin: 0 0 0.7rem; font-size: 0.82rem; line-height: 1.5; color: var(--text); word-break: break-word; }
 .dash-main .cta-button.danger { background: #ff6b6b; border-color: #ff6b6b; color: #fff; }
 .dash-main .cta-button.ghost.danger { background: transparent; color: #ff6b6b; border-color: rgba(255,107,107,0.4); }
-
-/* ============ Teams ============ */
 
 .nav-badge {
   margin-left: auto;
@@ -1851,8 +1729,6 @@
   border-radius: 10px;
   min-width: 0;
 }
-
-/* Clickable team in the list — same look as a project row */
 .team-card {
   width: 100%;
   margin-top: 0.6rem;
@@ -1870,8 +1746,6 @@
   border-color: var(--border-strong);
   outline: none;
 }
-
-/* Tappable shared-project row inside a team (same affordance as .team-card) */
 .team-row-open {
   cursor: pointer;
   color: inherit;
@@ -1884,8 +1758,6 @@
   border-color: var(--border-strong);
   outline: none;
 }
-
-/* “Key not in vault” ghost tag: explains instead of pretending to be a button */
 .key-ghost {
   display: inline-flex;
   align-items: center;
@@ -1935,9 +1807,6 @@
   gap: 0.5rem;
   flex-shrink: 0;
 }
-
-/* Role chip: a neutral label, not an achievement — gray for member AND admin
-   (green is for CTAs/active-nav/success, per the style guide). */
 .team-role {
   font-size: 0.78rem;
   font-weight: 600;
@@ -1988,10 +1857,6 @@
 .team-invited {
   border-color: var(--accent-dim);
 }
-
-/* Destructive buttons: dim translucent fill, border the same red as the text.
-   Uses !important to outrank .cta-button.ghost and the light-mode overrides.
-   The armed (click-again) state flips to solid red so the final tap is loud. */
 .team-danger-btn,
 .team-danger-btn:hover {
   margin-top: 0.85rem;
@@ -2015,8 +1880,6 @@
   border-color: #e84848 !important;
   color: #ffffff !important;
 }
-
-/* Accept-invite page */
 .invite-card {
   max-width: 34rem;
 }
@@ -2036,7 +1899,6 @@
 }
 
 @media (max-width: 54rem) {
-  /* Long emails wrap onto a second line instead of squeezing the actions */
   .team-row {
     flex-wrap: wrap;
   }
@@ -2061,8 +1923,6 @@
     width: 100%;
   }
 }
-
-/* ---------- Mobile: real, solid, fixed top bar (iOS 26 Safari tints its status bar from this) ---------- */
 @media (max-width: 54rem) {
   .dash-shell { --topbar-h: 3.5rem; }
 
@@ -2086,9 +1946,6 @@
     padding-top: calc(var(--topbar-h) + 1.25rem);
   }
 }
-
-/* ---------- Light mode: deeper emerald, white text on solid green ---------- */
-/* Light mode: solid green buttons/env-tabs/nav-badge get white text, WhatsApp-style */
 .dash-shell[data-theme='light'] .cta-button:not(.ghost):not(.danger),
 .dash-shell[data-theme='light'] .env-tab.active,
 .dash-shell[data-theme='light'] .nav-badge,
@@ -2100,8 +1957,6 @@
   background: var(--accent-dim);
   color: #ffffff;
 }
-
-/* Light mode: sidebar/topbar use the WhatsApp-white surface on a white canvas */
 .dash-shell[data-theme='light'] .dash-side {
   background: var(--surface);
 }
@@ -2110,19 +1965,13 @@
 .dash-shell[data-theme='light'] .store-preview {
   background: var(--surface-raised);
 }
-
-/* Light mode: stat icons read better slightly dimmed, like the dark theme */
 .dash-shell[data-theme='light'] .stat-icon {
   opacity: 0.9;
 }
 
-/* ---------- Cron / Monitors ---------- */
-
 .cron-row {
   flex-wrap: wrap;
 }
-
-/* Cron job form: key/value rows for custom request headers */
 .cron-header-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
@@ -2144,8 +1993,6 @@
 .cron-dot.err { background: #ff5c5c; }
 .cron-dot.warn { background: #ffb020; }
 .cron-dot.off { background: var(--text-muted); opacity: 0.5; }
-
-/* Advanced cron: custom request-header rows (name | value | remove) */
 .cron-header-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
@@ -2154,8 +2001,6 @@
   margin-bottom: 0.4rem;
 }
 .cron-header-row .icon-btn { flex-shrink: 0; }
-
-/* Common / advanced header row on the cron form */
 .cron-form-head {
   display: flex;
   align-items: center;
@@ -2164,9 +2009,6 @@
   flex-wrap: wrap;
 }
 .cron-form-head .cron-mode-pick { order: 2; margin-left: auto; }
-
-/* Status pill: semantic color only (up/down/pending are genuine status),
-   sans sentence-case text — no tracked-out mono caps. */
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -2223,8 +2065,6 @@
 
 .cron-run-status.ok { color: var(--accent); }
 .cron-run-status.err { color: #ff5c5c; }
-
-/* Stat numbers line up digit-for-digit as they tick */
 .stat-num { font-variant-numeric: tabular-nums; }
 
 .cron-add {
@@ -2242,7 +2082,6 @@
 }
 
 @media (max-width: 54rem) {
-  /* Extra children the base .kv-add-row mobile rules don't know about: stack them */
   .cron-add { grid-template-columns: minmax(0, 1fr); }
   .cron-add > div { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
   .cron-schedule-input { align-self: auto; }
@@ -2262,8 +2101,6 @@
 .mon-error .auth-error {
   margin: 0;
 }
-
-/* ---------- Logs ---------- */
 
 .logs-toolbar {
   display: flex;
@@ -2364,8 +2201,6 @@
   .logs-add .ttl-input { grid-column: 1 / -1; }
 }
 
-/* ---------- Key vault: shown-once banner + paste row ---------- */
-
 .rotated-key-banner {
   border: 1px solid var(--accent);
   border-radius: 12px;
@@ -2387,9 +2222,6 @@
 .rotated-key-head span { flex: 1; }
 
 .rotated-strip { margin: 0; }
-
-/* The 71-char key must WRAP inside the strip, not stretch it: .run-strip code
-   is nowrap, which makes this row blow past the banner/card width. */
 .rotated-strip code {
   flex: 1;
   min-width: 0;
@@ -2415,8 +2247,6 @@
   line-height: 1.5;
   color: var(--text-muted);
 }
-
-/* ============ 404 page ============ */
 
 .notfound {
   max-width: 34rem;
@@ -2462,7 +2292,6 @@
 @media (prefers-reduced-motion: reduce) {
   .notfound-face { transform: none !important; transition: none !important; }
 }
-/* ============ Status page: admin controls (AdminPanel 'status' tab) ============ */
 
 .status-admin-head {
   display: flex;
@@ -2479,8 +2308,6 @@
   gap: 0.45rem;
   font-size: 0.95rem;
 }
-
-/* Notification feed: auto-opened incidents */
 .status-admin-notifs { display: flex; flex-direction: column; gap: 0.5rem; }
 .status-admin-notif {
   display: flex;
@@ -2501,8 +2328,6 @@
 .status-admin-notif-body p { margin: 0; font-size: 0.87rem; }
 .status-admin-notif-body span { font-size: 0.72rem; color: var(--text-muted); }
 .status-admin-notif-body em { font-size: 0.78rem; color: var(--text-muted); overflow-wrap: anywhere; }
-
-/* Service list + mode switch */
 .status-admin-services { display: flex; flex-direction: column; gap: 0.6rem; }
 .status-admin-service {
   border: 1px solid var(--border);
@@ -2542,8 +2367,6 @@
   background: var(--accent-soft);
   color: var(--accent);
 }
-
-/* Incident composer + update drafts */
 .status-admin-form {
   display: flex;
   flex-direction: column;
@@ -2578,8 +2401,6 @@
 .status-admin-incident-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .status-admin-update { margin: 0; font-size: 0.8rem; color: var(--text-muted); }
 .status-admin-update time { font-size: 0.7rem; }
-
-/* Dashboard-wide alert banner (admin, unseen incidents) */
 .status-alert-banner {
   width: 100%;
   text-align: left;
@@ -2615,14 +2436,9 @@
   .status-mode-switch { width: 100%; justify-content: space-between; }
   .status-mode-switch button { flex: 1; }
 }
-
-/* fixes: filter icon overlapping placeholder, shared-key paste row squeezed into one grid cell */
 .dash-main .dash-filter input[type='text'] { padding-left: 2.6rem; }
 .dash-filter .filter-icon { left: 0.95rem; }
 .project-row .paste-key-row { grid-column: 1 / -1; }
-
-/* 2FA recovery codes: one-time secrets, so they read like data (mono, boxed)
-   and copy cleanly. Grid keeps them scannable in pairs. */
 .recovery-codes {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));

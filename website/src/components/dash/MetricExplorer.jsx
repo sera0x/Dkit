@@ -25,7 +25,6 @@ function buildPath(values, max) {
   return { line: d, area: `${d} L ${pts[pts.length - 1][0]} ${H - PAD.b} L ${pts[0][0]} ${H - PAD.b} Z`, pts };
 }
 
-// Pass `data` to render pre-fetched numbers, or `loader` (token) => Promise to fetch them.
 export default function MetricExplorer({ loader, data: preloaded, title = 'Activity', defaultActive = 'envSets' }) {
   const { token } = useAuth();
   const [fetched, setFetched] = useState(null);

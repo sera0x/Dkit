@@ -18,7 +18,6 @@ export default function AdminPanel() {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState('');
 
-  // Broadcast mail: draft, preview-ish summary, send to verified users.
   const [mailSubject, setMailSubject] = useState('');
   const [mailBody, setMailBody] = useState('');
   const [mailSending, setMailSending] = useState(false);

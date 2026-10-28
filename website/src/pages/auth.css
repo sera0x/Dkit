@@ -36,9 +36,6 @@
   font-weight: 500;
   color: var(--text-muted);
 }
-
-/* The email being typed is data-ish, but login forms read better in the UI
-   sans; every other dev tool does this (see dkit-style-guide.md). */
 .auth-card input {
   font-size: 0.95rem;
   background: var(--bg);
@@ -94,15 +91,13 @@
   font-size: 0.85rem;
   margin: 0;
 }
-
-/* Spacing around the CodeSlots OTP row on the auth cards */
 .auth-codeslots {
   margin: 0.9rem 0 0.9rem;
 }
 .auth-codeslots .code-slots {
   max-width: 100%;
   overflow-x: auto;
-  padding: 2px; /* keep focus/active rings from clipping */
+  padding: 2px;
 }
 
 .auth-error-list {
@@ -190,10 +185,6 @@
 .oauth-button svg {
   flex-shrink: 0;
 }
-
-/* Light-mode adjustments for the pieces that hardcode dark-theme colors:
-   the OAuth buttons are white-on-white without a visible border, and the
-   code slots keep their dark slate boxes unless retuned for the card. */
 .marketing-shell[data-theme='light'] .oauth-button {
   border-color: var(--border);
   box-shadow: 0 1px 2px rgba(16, 20, 16, 0.05);

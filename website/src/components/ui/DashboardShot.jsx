@@ -2,10 +2,6 @@ import React from 'react';
 import logo from '../../assets/dkit-logo.png';
 import './DashboardShot.css';
 
-// Stand-in for a product screenshot: the real dashboard rebuilt as plain,
-// theme-token-driven markup. Static on purpose (no animation, no glow); it
-// follows the marketing light/dark palette through the same CSS variables the
-// rest of the page uses.
 const DashboardShot = () => (
   <div className="dshot" aria-hidden="true">
     <div className="dshot-bar">

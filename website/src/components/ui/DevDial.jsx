@@ -2,10 +2,6 @@ import { useEffect } from 'react';
 import { DialRoot, useDialKit } from 'dialkit';
 import 'dialkit/styles.css';
 
-// Live-tune the motion tokens (index.css :root) while the app runs.
-// Dev-only: App.jsx mounts this behind import.meta.env.DEV, so the prod
-// bundle never fetches this chunk. Tweak sliders bottom-right while using
-// the dashboard, then bake the values you like back into index.css.
 export default function DevDial() {
   const d = useDialKit('Motion tokens', {
     'duration-quick': [150, 0, 600, 10],

@@ -4,8 +4,6 @@ const app = express()
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 app.use(express.json())
 
-// Request log lines shipped to Dkit's log drain (no-ops without DKIT_API_KEY,
-// so local dev without dkit never breaks).
 let dkit
 try { dkit = require('./dkit-logger') } catch { dkit = null }
 

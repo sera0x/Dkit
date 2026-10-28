@@ -2,9 +2,6 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
 
-// No splash screen: #root is empty until the bundle executes, but the page
-// background is already dark (index.html), so first paint is instant and the
-// app renders the moment JS arrives — no "booting" stall in between.
 async function boot() {
   const rootEl = document.getElementById('root')
   try {

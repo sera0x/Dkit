@@ -1,7 +1,3 @@
-// Keeps the browser chrome (iOS status bar, overscroll area) in step with the theme.
-// iOS 26 Safari ignores <meta name="theme-color">. It tints from a fixed element at the
-// very top of the viewport, else from <body>'s background, and re-reads only at certain
-// moments. So we drive all sources: inline body/html bg, a re-created fixed strip, the meta.
 
 export const MARKETING_THEME_COLOR = '#050606';
 export const SHELL_LIGHT_THEME_COLOR = '#ffffff';
@@ -28,10 +24,6 @@ function replaceStrip(color) {
 let resampleTimer = null;
 let stripColor = MARKETING_THEME_COLOR;
 
-// Re-apply the last chrome theme without computing anything. Called on shell
-// mount so a late-mounted React tree adopts chrome that React could not
-// observe (before first paint, or after a hard refresh restored a mid-session
-// light color on <html> that the unmount cleanup never saw).
 export function syncChrome() {
   const root = document.documentElement;
   if (root.getAttribute('data-chrome') === 'light') {

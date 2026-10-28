@@ -15,9 +15,6 @@ password: process.env.DB_PASSWORD,
 port: process.env.DB_PORT || 5432,
 })
 const redisClient = redis.createClient({ url: 'redis://localhost:6379' })
-// A restarted/idle-dropped Postgres kills pooled connections; the pool then
-// emits 'error', and with no listener that crashes the whole API (site 502s
-// until systemd restarts it). Log it and let the pool self-heal instead.
 pool.on('error', (err) => console.error('Idle DB client error:', err && err.message))
 redisClient.connect().catch(err => console.error('Redis connect failed:', err))
 async function initDB() {
@@ -63,8 +60,6 @@ await pool.query(`ALTER TABLE team_invites ADD COLUMN IF NOT EXISTS invited_by U
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_team_invites_email ON team_invites (LOWER(email))`)
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_team_invites_team ON team_invites (team_id)`)
 
-// Team workspaces: projects shared into a team stay owned by the user who added
-// them (they keep their api_key and personal listing); membership grants access.
 await pool.query(`CREATE TABLE IF NOT EXISTS team_projects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
@@ -77,10 +72,6 @@ await pool.query(`CREATE INDEX IF NOT EXISTS idx_team_projects_team ON team_proj
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_team_projects_project ON team_projects (project_id)`)
 
 await pool.query(`CREATE TABLE IF NOT EXISTS oauth_states (state TEXT PRIMARY KEY, provider TEXT NOT NULL, expires_at TIMESTAMP DEFAULT NOW() + INTERVAL '10 minutes', created_at TIMESTAMP DEFAULT NOW())`)
-// Long-lived sessions for the website + CLI. The refresh token is stored as a
-// SHA-256 hash (the plaintext value is only ever known by the client), so a DB
-// leak can't be replayed into new access tokens. Absolute expiry of 180 days
-// means even active users re-authenticate quarterly.
 await pool.query(`CREATE TABLE IF NOT EXISTS sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -96,8 +87,6 @@ await pool.query(`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_sessions_hash ON sessions (refresh_hash)`)
 await pool.query(`CREATE TABLE IF NOT EXISTS env_history (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), project_id UUID REFERENCES projects(id) ON DELETE CASCADE, key TEXT NOT NULL, environment TEXT NOT NULL, old_value TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW())`)
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_env_history_lookup ON env_history(project_id, key, environment, created_at DESC)`)
-// Audit trail columns: what happened ('set'/'update'/'delete'/'rollback'), who
-// (advisory — the CLI tags requests with the logged-in email) and from where.
 await pool.query(`ALTER TABLE env_history ADD COLUMN IF NOT EXISTS action TEXT DEFAULT 'set'`)
 await pool.query(`ALTER TABLE env_history ADD COLUMN IF NOT EXISTS actor TEXT`)
 await pool.query(`ALTER TABLE env_history ADD COLUMN IF NOT EXISTS actor_ip TEXT`)
@@ -105,14 +94,7 @@ await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DE
 await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended BOOLEAN DEFAULT FALSE`)
 await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_ip TEXT`)
 await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP`)
-// Boot-time settings: the API fills any missing env var from the special
-// 'dkit-self' project (see loadSelfSettings in server.js). Dkit configures
-// itself with Dkit.
 await pool.query(`CREATE TABLE IF NOT EXISTS self_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMP DEFAULT NOW())`)
-// Two-factor auth (TOTP). The secret is stored as-is (obfuscating it client-side
-// would be theater — the server has to read it to derive codes); totp_enabled
-// flips on only after the first code verifies, so a half-finished setup can't
-// lock anyone out. Recovery codes are SHA-256 hashes, plaintext shown once.
 await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT`)
 await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN DEFAULT FALSE`)
 await pool.query(`CREATE TABLE IF NOT EXISTS recovery_codes (
@@ -123,27 +105,17 @@ await pool.query(`CREATE TABLE IF NOT EXISTS recovery_codes (
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(user_id, code_hash)
 )`)
-// Pending second-factor challenges (password or OAuth passed, 2FA code not yet
-// given). Separate from login_codes so an email-code and a TOTP challenge can
-// never collide on the same token.
 await pool.query(`CREATE TABLE IF NOT EXISTS login_challenges (
   login_token TEXT PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   expires_at TIMESTAMP DEFAULT NOW() + INTERVAL '10 minutes',
   created_at TIMESTAMP DEFAULT NOW()
 )`)
-// API keys are stored as SHA-256 hashes — the plaintext is shown once at
-// creation (or rotation) and lives only on a client. key_prefix keeps a
-// recognisable "dk_…" hint for the dashboard; key_rotated_at feeds the UI.
 await pool.query(`ALTER TABLE projects ADD COLUMN IF NOT EXISTS key_hash TEXT UNIQUE`)
 await pool.query(`ALTER TABLE projects ADD COLUMN IF NOT EXISTS key_prefix TEXT`)
 await pool.query(`ALTER TABLE projects ADD COLUMN IF NOT EXISTS key_rotated_at TIMESTAMP`)
 await pool.query(`ALTER TABLE projects ALTER COLUMN api_key DROP NOT NULL`)
 
-// ---------------------------------------------------------------------------
-// Cron jobs: schedule outbound HTTP calls from the API. next_run_at is the
-// work queue — the background ticker in jobs.js claims due rows.
-// ---------------------------------------------------------------------------
 await pool.query(`CREATE TABLE IF NOT EXISTS cron_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
@@ -172,10 +144,6 @@ await pool.query(`CREATE TABLE IF NOT EXISTS cron_runs (
 )`)
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_cron_runs_job ON cron_runs (job_id, started_at DESC)`)
 
-// ---------------------------------------------------------------------------
-// Uptime monitors: the API probes your URLs and emails you on down/up. Status
-// flips to 'down' after 2 consecutive failures, back to 'up' after 1 success.
-// ---------------------------------------------------------------------------
 await pool.query(`CREATE TABLE IF NOT EXISTS monitors (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
@@ -206,10 +174,6 @@ await pool.query(`CREATE TABLE IF NOT EXISTS monitor_checks (
 )`)
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_monitor_checks ON monitor_checks (monitor_id, checked_at DESC)`)
 
-// ---------------------------------------------------------------------------
-// Log drain: ship logs from any app over HTTP, tail them from the CLI or the
-// dashboard. 7-day retention (cleaned in jobs.js) keeps this table small.
-// ---------------------------------------------------------------------------
 await pool.query(`CREATE TABLE IF NOT EXISTS log_entries (
   id BIGSERIAL PRIMARY KEY,
   project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
@@ -222,13 +186,6 @@ await pool.query(`CREATE TABLE IF NOT EXISTS log_entries (
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_logs_project_ts ON log_entries (project_id, ts DESC)`)
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_logs_project_level ON log_entries (project_id, level)`)
 
-// ---------------------------------------------------------------------------
-// Media files: an image/file CDN on Cloudflare R2. Bytes live in the bucket
-// (so a packed VPS never holds them), this table carries only metadata. `key`
-// is the unguessable public slug embedded in /f/<key> URLs; r2_key is the full
-// storage path inside the bucket. Temporary uploads carry expires_at — the job
-// runner deletes expired rows (and their objects) within a minute of expiry.
-// ---------------------------------------------------------------------------
 await pool.query(`CREATE TABLE IF NOT EXISTS media_files (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
@@ -247,11 +204,6 @@ await pool.query(`CREATE TABLE IF NOT EXISTS media_files (
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_media_project ON media_files (project_id, created_at DESC)`)
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_media_expiry ON media_files (expires_at) WHERE expires_at IS NOT NULL AND deleted_at IS NULL`)
 
-// ---------------------------------------------------------------------------
-// Public status page (dkit.name.ng/status). Dkit watches its own services
-// with the same prober that powers user monitors, but with admin control on
-// top: an admin can force a service up/down for maintenance and post incidents.
-// ---------------------------------------------------------------------------
 await pool.query(`CREATE TABLE IF NOT EXISTS status_services (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT UNIQUE NOT NULL,
@@ -306,8 +258,6 @@ await pool.query(`ALTER TABLE status_incidents ADD COLUMN IF NOT EXISTS seen_by_
 console.log('Database initialized')
 }
 
-// One-time migration: projects created before hashing keep their plaintext key
-// in api_key. Hash it into key_hash, keep the prefix, then scrub the plaintext.
 async function migrateProjectKeys() {
   const legacy = await pool.query('SELECT id, api_key FROM projects WHERE key_hash IS NULL AND api_key IS NOT NULL')
   for (const row of legacy.rows) {

@@ -36,12 +36,9 @@ const NAV_ITEMS = [
   { id: 'admin', label: 'admin', Icon: ShieldCheck },
 ];
 
-// Two-factor (TOTP) management: link QR, live-code confirmation, recovery
-// codes shown once, and a disable path that demands the password plus a
-// current code (a stolen browser session alone can't turn 2FA off).
 function SecuritySection({ token }) {
   const [status, setStatus] = useState(null);
-  const [setup, setSetup] = useState(null); // { secret, otpauth_url, qr }
+  const [setup, setSetup] = useState(null);
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [recoveryCodes, setRecoveryCodes] = useState(null);
@@ -58,8 +55,6 @@ function SecuritySection({ token }) {
     setBusy(true); setError('');
     try {
       const s = await api.twofaSetup(token);
-      // Rendered locally on purpose: the otpauth URL embeds the TOTP secret,
-      // and it never leaves the machine for a third-party QR service.
       const qr = await QRCode.toDataURL(s.otpauth_url, { margin: 1, width: 180 });
       setSetup({ ...s, qr });
     } catch (e) { setError(e.message || 'Setup failed'); } finally { setBusy(false); }
@@ -203,7 +198,6 @@ const bullets = (v) => '•'.repeat(Math.max(4, Math.min(String(v ?? '').length,
 
 export default function Dashboard({ onNavigate }) {
   const { user, token, refreshToken, logout } = useAuth();
-  // Landing from elsewhere (e.g. right after accepting a team invite) can ask for a specific tab
   const [section, setSection] = useState(() => {
     const wanted = takeDashboardSection();
     return NAV_ITEMS.some((n) => n.id === wanted && n.id !== 'admin') ? wanted : 'overview';
@@ -211,14 +205,11 @@ export default function Dashboard({ onNavigate }) {
   const [teamInvites, setTeamInvites] = useState([]);
   const [suspended, setSuspended] = useState(false);
   const [isAdmin, setIsAdmin] = useState(!!user?.is_admin);
-  // Admin notification feed for the status page: when automated probes open an
-  // incident, the admin tab grows a dot and a banner appears here until seen.
-  const [statusPing, setStatusPing] = useState(null); // { unseen_count } | null
+  const [statusPing, setStatusPing] = useState(null);
   const [confirmTag, setConfirmTag] = useState('');
-  const [confirmFor, setConfirmFor] = useState(null); // type-to-confirm banner target (deletions)
+  const [confirmFor, setConfirmFor] = useState(null);
   const [copiedTag, setCopiedTag] = useState('');
 
-  // account + projects
   const [verified, setVerified] = useState(true);
   const [checkingVerify, setCheckingVerify] = useState(true);
   const [codeStatus, setCodeStatus] = useState('idle');
@@ -232,19 +223,15 @@ export default function Dashboard({ onNavigate }) {
   const [creating, setCreating] = useState(false);
   const [totals, setTotals] = useState(null);
 
-  // Key vault: API keys are hashed server-side, so the browser only has what
-  // the user deliberately saved here (shown once at create/rotate/paste).
-  // Reveal + copy read from the vault; anything else honestly shows the prefix.
   const [keyVault, setKeyVault] = useState(() => vault.read());
   const [revealedApiKeys, setRevealedApiKeys] = useState(() => new Set());
-  const [pasteFor, setPasteFor] = useState(null);   // project id awaiting a pasted key
+  const [pasteFor, setPasteFor] = useState(null);
   const [pasteValue, setPasteValue] = useState('');
   const [pasteError, setPasteError] = useState('');
-  const [rotatedKey, setRotatedKey] = useState(null); // { name, api_key } — shown once
-  const [copyHint, setCopyHint] = useState('');       // project id whose copy needs a hint
-  const [busyKeyOp, setBusyKeyOp] = useState(null);   // project id while issuing a key
+  const [rotatedKey, setRotatedKey] = useState(null);
+  const [copyHint, setCopyHint] = useState('');
+  const [busyKeyOp, setBusyKeyOp] = useState(null);
 
-  // selection + env vars
   const [selectedId, setSelectedId] = useState(null);
   const [environment, setEnvironment] = useState('production');
   const [envVars, setEnvVars] = useState({});
@@ -256,9 +243,8 @@ export default function Dashboard({ onNavigate }) {
   const [newEnvKey, setNewEnvKey] = useState('');
   const [newEnvValue, setNewEnvValue] = useState('');
   const [savingEnv, setSavingEnv] = useState(false);
-  const [envImport, setEnvImport] = useState(null);   // { text, project, env, busy, status, error }
+  const [envImport, setEnvImport] = useState(null);
 
-  // store
   const [storeItems, setStoreItems] = useState([]);
   const [storeLoading, setStoreLoading] = useState(false);
   const [storeError, setStoreError] = useState('');
@@ -271,17 +257,14 @@ export default function Dashboard({ onNavigate }) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
 
-  // api keys
-  // (revealedApiKeys moved up next to the vault state)
 
-  // devices / sessions
   const [sessions, setSessions] = useState([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
 
   const selected = projects.find((p) => p.id === selectedId) || null;
 
   const flash = useCallback((tag) => {
-    setCopiedTag(''); // clear so same tag re-triggers
+    setCopiedTag('');
     requestAnimationFrame(() => setCopiedTag(tag));
     setTimeout(() => setCopiedTag((t) => (t === tag ? '' : t)), 1400);
   }, []);
@@ -307,9 +290,6 @@ export default function Dashboard({ onNavigate }) {
     try {
       const data = await api.getProjects(token);
       const own = data.projects || [];
-      // Projects shared into teams the user belongs to appear in the same
-      // lists as their own — membership is the grant (env, store, cron,
-      // monitors, logs all accept team members). Tagged for the UI.
       const shared = (data.shared_projects || [])
         .filter((sp) => !own.some((p) => p.id === sp.id))
         .map((sp) => ({ ...sp, is_shared: true }));
@@ -331,7 +311,6 @@ export default function Dashboard({ onNavigate }) {
   }, [token, refreshToken]);
 
   useEffect(() => { loadVerification(); loadProjects(); loadTeamInvites(); loadSessions(); }, [loadVerification, loadProjects, loadTeamInvites, loadSessions]);
-  // Esc dismisses the type-to-confirm banner; navigating unmounts it (keyed section).
   useEffect(() => {
     if (!confirmFor) return;
     const onKey = (e) => { if (e.key === 'Escape') setConfirmFor(null); };
@@ -339,9 +318,6 @@ export default function Dashboard({ onNavigate }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [confirmFor]);
 
-  // Overview totals: one round-trip replaces the old per-project fanout
-  // (which also silently under-counted: it used each project's api_key, which
-  // the browser no longer has for hashed keys).
   useEffect(() => {
     let cancelled = false;
     api.getOverview(token)
@@ -349,15 +325,11 @@ export default function Dashboard({ onNavigate }) {
       .catch(() => { if (!cancelled) setTotals(null); });
     return () => { cancelled = true; };
   }, [token, projects]);
-  // Slow poll keeps "last active" fresh; sessions change rarely.
   useEffect(() => {
     const t = setInterval(loadSessions, 60000);
     return () => clearInterval(t);
   }, [loadSessions]);
 
-  // Keep the session fresh without advertising admin status:
-  // - /auth/me only tells us if the account is suspended (403)
-  // - /admin/session tells us (privately) whether the admin tab should appear
   useEffect(() => {
     let cancelled = false;
     api.getSession(token)
@@ -366,8 +338,6 @@ export default function Dashboard({ onNavigate }) {
       .then(() => {
         if (cancelled) return;
         setIsAdmin(true);
-        // Status notifications piggyback on the admin probe — regular users
-        // never learn this endpoint exists.
         api.getAdminStatus(token)
           .then((d) => { if (!cancelled) setStatusPing(d?.unseen_count ? { unseen_count: d.unseen_count } : null); })
           .catch(() => { if (!cancelled) setStatusPing(null); });
@@ -376,11 +346,10 @@ export default function Dashboard({ onNavigate }) {
     return () => { cancelled = true; };
   }, [token]);
 
-  // (old per-project count fanout removed — /api/overview handles it)
 
   const toggleApiKeyReveal = (p) => {
     const saved = keyVault[p.id];
-    if (!saved) { setPasteFor(p.id); setPasteValue(''); setPasteError(''); return; } // no key saved → offer paste
+    if (!saved) { setPasteFor(p.id); setPasteValue(''); setPasteError(''); return; }
     setRevealedApiKeys((prev) => {
       const next = new Set(prev);
       next.has(p.id) ? next.delete(p.id) : next.add(p.id);
@@ -414,8 +383,6 @@ export default function Dashboard({ onNavigate }) {
     catch (err) { setVerifyError(err.message); }
   };
 
-  // Auto-submitted by CodeSlots onComplete with the just-completed code, or by
-  // the button as a manual fallback. verifyingRef guards double submits.
   const submitVerify = async (value) => {
     if (verifyingRef.current || !/^\d{6}$/.test(value)) return;
     verifyingRef.current = true;
@@ -426,7 +393,7 @@ export default function Dashboard({ onNavigate }) {
     } catch (err) {
       verifyingRef.current = false;
       setVerifyError(err.message);
-      setCodeStatus('error'); // CodeSlots drains the digits and clears itself
+      setCodeStatus('error');
     }
   };
 
@@ -437,14 +404,10 @@ export default function Dashboard({ onNavigate }) {
       setProjects((prev) => [project, ...prev]);
       setNewName('');
       if (project.api_key) {
-        // The plaintext key exists exactly once. Save it to this browser's vault
-        // (so reveal/copy work here) and show it with a copy button — after this,
-        // only a hash lives server-side.
         vault.save(project.id, project.api_key);
         setKeyVault(vault.read());
         setRotatedKey({ name: project.name, api_key: project.api_key });
       }
-      // Land straight in the new project's secrets — that's the usual next step.
       setSection('secrets');
       setSelectedId(project.id);
       loadEnvVars(project, environment);
@@ -470,8 +433,6 @@ export default function Dashboard({ onNavigate }) {
     try {
       const res = await api.createProjectApiKey(token, p.id);
       setProjects((prev) => prev.map((x) => (x.id === p.id ? { ...x, key_prefix: res.key_prefix, key_rotated_at: res.key_rotated_at } : x)));
-      // Same one-time contract as create/rotate: vault it so reveal/copy work
-      // in this browser, and show it once on the banner.
       vault.save(p.id, res.api_key);
       setKeyVault(vault.read());
       setRotatedKey({ name: res.name || p.name, api_key: res.api_key });
@@ -479,14 +440,12 @@ export default function Dashboard({ onNavigate }) {
     finally { setBusyKeyOp(null); }
   };
 
-  // Single-tap revoke: no confirm step, the key dies immediately.
-  // Recovery is one click (create key) since the project just goes keyless.
   const revokeApiKey = async (p) => {
     setCreateError('');
     try {
       await api.revokeProjectApiKey(token, p.id);
       setProjects((prev) => prev.map((x) => (x.id === p.id ? { ...x, key_prefix: null, key_rotated_at: new Date().toISOString() } : x)));
-      vault.forget(p.id); // the old key is dead — drop it from this browser too
+      vault.forget(p.id);
       setKeyVault(vault.read());
       setRevealedApiKeys((prev) => { const next = new Set(prev); next.delete(p.id); return next; });
     } catch (err) { setCreateError(err.message); }
@@ -496,7 +455,7 @@ export default function Dashboard({ onNavigate }) {
     if (confirmTag !== 'session:' + s.id) { armConfirm('session:' + s.id); return; }
     try {
       await api.revokeSession(token, s.id);
-      if (s.current) { logout(); onNavigate('/'); } // revoked THIS device
+      if (s.current) { logout(); onNavigate('/'); }
       else { setConfirmTag(''); loadSessions(); }
     } catch (err) { setCreateError(err.message); }
   };
@@ -506,15 +465,11 @@ export default function Dashboard({ onNavigate }) {
     catch (err) { setCreateError(err.message); }
   };
 
-  // Project-scoped calls go out with the session (Bearer + x-project-id).
-  // The old code passed project.api_key — undefined for hashed keys — which is
-  // why secrets/store silently broke for every new project.
   const loadEnvVars = useCallback(async (project, env) => {
     setEnvLoading(true); setEnvError('');
     try { const data = await api.projectEnv(token, project.id, env); setEnvVars(data.env || {}); }
     catch (err) { setEnvVars({}); setEnvError(err.message); }
     finally { setEnvLoading(false); }
-    // Audit feed rides along so it stays fresh after add/delete/rollback
     try { const a = await api.getAudit(token, project.id); setAudit(a.events || []); }
     catch { setAudit([]); }
   }, [token]);
@@ -526,9 +481,6 @@ export default function Dashboard({ onNavigate }) {
     finally { setStoreLoading(false); }
   }, [token]);
 
-  // Projects shared into a team render under that team's name (the container
-  // they belong to); personal projects sit below under "Your projects". A
-  // project shared into several teams shows once, under its first team.
   const projectGroups = useMemo(() => {
     const groups = [];
     const byTeam = new Map();
@@ -634,13 +586,11 @@ export default function Dashboard({ onNavigate }) {
     setSelectedId(p.id);
     setRevealedKeys(new Set());
     setFilter('');
-    setRotatedKey(null); // the one-time key banner belongs to the project it came from
+    setRotatedKey(null);
     loadEnvVars(p, environment);
     loadStore(p);
   };
 
-  // Open a project by id (own or team-shared) — used by the Teams tab's
-  // tappable shared-project rows.
   const openProjectById = (id) => {
     const p = projects.find((x) => x.id === id);
     if (!p) return;
@@ -673,7 +623,6 @@ export default function Dashboard({ onNavigate }) {
     finally { setSavingEnv(false); }
   };
 
-  // Paste a .env file (or any KEY=value lines) straight into the project.
   const importEnvFile = async (project) => {
     const text = (envImport?.text || '').trim();
     if (!text) return;
@@ -775,8 +724,7 @@ export default function Dashboard({ onNavigate }) {
           {id === 'admin' && statusPing && <span className="nav-badge alert" aria-label={statusPing.unseen_count + ' unseen incident notifications'} />}
         </button>
       ))}
-      {/* Pick the project once, here — every section follows. No more
-          re-picking inside Secrets, Cron, Monitors, Logs, Store. */}
+      {}
       {projects.length > 0 && (
         <div className="project-picker-side">
           <span className="project-picker-title">Projects</span>
@@ -800,7 +748,7 @@ export default function Dashboard({ onNavigate }) {
 
   return (
     <AppShell active="dashboard" onNavigate={onNavigate} primaryNav={navButtons()}>
-      {/* key={section} remounts on section change so the enter transition plays */}
+      {}
       <div className="dash-section" key={section} onKeyDown={(e) => { if (e.key === 'Escape') setConfirmFor(null); }}>
       {statusPing && (
         <button className="status-alert-banner" role="alert" onClick={() => { setSection('admin'); setStatusPing(null); }}>
@@ -1035,8 +983,7 @@ export default function Dashboard({ onNavigate }) {
                           <span className="kv-key">{key}</span>
                           <span className={'kv-value' + (revealedKeys.has(key) ? ' revealed' : '')}>{revealedKeys.has(key) ? value : bullets(value)}</span>
                           <span className="secrets-acts">
-                            {/* Copy while still masked: the value is already in browser memory, so copying it is
-                                no worse than the eye — and it kills the “paste it to me on WhatsApp” dance. */}
+                            {}
                             <button className="icon-btn" aria-label={'Copy value of ' + key} title="Copy value" onClick={() => { navigator.clipboard?.writeText(String(value)); flash('env:' + key); }}>
                               {copiedTag === 'env:' + key ? <Check width="14" height="14" /> : <Copy width="14" height="14" />}
                             </button>

@@ -1,11 +1,3 @@
-# Minimal Cloudflare Tunnel ingress for one public hostname.
-#
-#   cloudflared tunnel create dkit
-#   cloudflared tunnel route dns dkit dkit.example.com
-#   cp config.example.yml ~/.cloudflared/config.yml
-#
-# Replace <TUNNEL_ID> and the hostname. The credentials JSON is created by
-# `cloudflared tunnel create` and must stay private — never commit it.
 tunnel: <TUNNEL_ID>
 credentials-file: /home/<user>/.cloudflared/<TUNNEL_ID>.json
 

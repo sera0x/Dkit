@@ -1,23 +1,9 @@
-// Public status page (dkit.name.ng/status) engine.
-//
-// Dkit watches its own services with the same idea as user monitors
-// (jobs.js), plus the pieces a status page needs on top:
-//
-//   - Seeded service list: API, Website, Docs (probed over HTTP).
-//   - Admin override per service: mode = 'auto' | 'manual_up' | 'manual_down'.
-//     'manual_down' is maintenance: probes stop, the page shows maintenance,
-//     and a manual incident is opened. 'manual_up' forces the page green.
-//   - Incident automation: a down-flip opens an 'auto' incident (if none is
-//     open for that service); recovery resolves it with a downtime summary.
-//     Admins see these as notifications on the dashboard until acknowledged.
-//
-// Everything here is best-effort — a failing probe is recorded, never thrown.
 
 const { pool } = require('./db')
 const { sendUptimeAlertEmail } = require('./email')
 
-const PROBE_INTERVAL_S = 60       // how often each service is checked
-const CHECK_RETENTION_HOURS = 48  // probe history kept for the uptime bar
+const PROBE_INTERVAL_S = 60
+const CHECK_RETENTION_HOURS = 48
 const UPTIME_REFRESH_MS = 5 * 60 * 1000
 
 function normalizeOrigin(url) {
@@ -26,7 +12,6 @@ function normalizeOrigin(url) {
   return /^https?:\/\//i.test(u) ? u.replace(/\/+$/, '') : 'https://' + u.replace(/\/+$/, '')
 }
 
-// Seed the core services once. Later boots keep admin edits (ON CONFLICT DO NOTHING).
 async function ensureSeed() {
   const self = 'http://localhost:' + (process.env.PORT || 3001)
   const base = normalizeOrigin(process.env.PUBLIC_URL) || self
@@ -43,12 +28,7 @@ async function ensureSeed() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Probing
-// ---------------------------------------------------------------------------
 async function probeService(s, { force = false } = {}) {
-  // Manual modes mean a human owns this service's state right now — don't
-  // fight them with probe results (force = the admin's explicit "check now").
   if (!force && s.mode !== 'auto') {
     await pool.query('UPDATE status_services SET last_checked_at = NOW() WHERE id = $1', [s.id]).catch(() => {})
     return { skipped: true }
@@ -102,8 +82,6 @@ async function probeService(s, { force = false } = {}) {
 
   if (flippedDown) {
     await openAutoIncident(s, errorText).catch(() => {})
-    // Email the admin account — down/up flips only, prober-driven flips only
-    // (manual maintenance is an admin action, not a failure).
     sendStatusFlipEmail(s.name, s.url, 'down', errorText).catch(() => {})
   }
   if (flippedUp) {
@@ -124,11 +102,6 @@ async function runDueProbes() {
   return due.rows.length
 }
 
-// ---------------------------------------------------------------------------
-// Incident automation
-// ---------------------------------------------------------------------------
-// The status prober emails the first admin account on down/up flips, reusing
-// the monitor alert mail. Best-effort; no recipient configured → skip.
 async function adminEmail() {
   const r = await pool.query('SELECT email FROM users WHERE COALESCE(is_admin, FALSE) ORDER BY created_at LIMIT 1')
   return r.rows[0]?.email || null
@@ -139,7 +112,7 @@ async function sendStatusFlipEmail(serviceName, url, status, errorText) {
     const to = await adminEmail()
     if (!to) return
     await sendUptimeAlertEmail(to, { name: 'Dkit · ' + serviceName, url, status, error: errorText })
-  } catch { /* never let a mail failure touch the probe loop */ }
+  } catch {  }
 }
 
 async function openAutoIncident(service, errorText) {
@@ -170,9 +143,6 @@ async function resolveAutoIncidents(service) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Admin controls
-// ---------------------------------------------------------------------------
 async function setServiceMode(serviceId, mode) {
   if (!['auto', 'manual_up', 'manual_down'].includes(mode)) throw new Error('Invalid mode')
   const cur = await pool.query('SELECT id, name, mode FROM status_services WHERE id = $1', [serviceId])
@@ -183,7 +153,6 @@ async function setServiceMode(serviceId, mode) {
   await pool.query('UPDATE status_services SET mode = $2 WHERE id = $1', [serviceId, mode])
 
   if (mode === 'manual_down') {
-    // Maintenance: open a manual incident unless one is already open.
     const open = await pool.query(
       'SELECT id FROM status_incidents WHERE service_id = $1 AND resolved_at IS NULL', [serviceId])
     if (open.rows.length === 0) {
@@ -198,7 +167,6 @@ async function setServiceMode(serviceId, mode) {
   }
 
   if (mode !== 'manual_down') {
-    // Leaving maintenance (either direction) resolves the manual incident.
     const open = await pool.query(
       `UPDATE status_incidents SET state = 'resolved', resolved_at = NOW(), updated_at = NOW()
        WHERE service_id = $1 AND source = 'manual' AND resolved_at IS NULL RETURNING id`, [serviceId])
@@ -218,9 +186,6 @@ async function forceCheck(serviceId) {
   return probeService(r.rows[0], { force: true })
 }
 
-// ---------------------------------------------------------------------------
-// Queries
-// ---------------------------------------------------------------------------
 function effectiveStatus(row) {
   if (row.mode === 'manual_down') return 'down'
   if (row.mode === 'manual_up') return 'up'
@@ -334,9 +299,6 @@ async function pruneChecks() {
   return r.rowCount
 }
 
-// ---------------------------------------------------------------------------
-// Main loop — same pattern as jobs.js: busy-guarded interval, never throws.
-// ---------------------------------------------------------------------------
 function startStatusProbes() {
   let busy = false
   let lastUptime = 0

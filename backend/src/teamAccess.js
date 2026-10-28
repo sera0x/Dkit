@@ -1,7 +1,5 @@
 const { pool } = require('./db')
 
-// Membership / permission helpers for team-scoped project access.
-// Roles: owner > admin > member  (matches the Teams routes in server.js)
 
 async function teamRole(teamId, userId) {
   const r = await pool.query('SELECT role FROM team_members WHERE team_id = $1 AND user_id = $2', [teamId, userId])
@@ -12,13 +10,11 @@ async function isTeamMember(teamId, userId) {
   return (await teamRole(teamId, userId)) !== null
 }
 
-// Can write secrets/store for projects shared into this team
 async function isTeamWriteable(teamId, userId) {
   const role = await teamRole(teamId, userId)
   return role === 'owner' || role === 'admin'
 }
 
-// Teams a project is shared into (the owner's "shared with" view)
 async function sharedTeamIdsForProject(projectId) {
   const r = await pool.query(
     `SELECT t.id, t.name, tp.added_at
@@ -30,8 +26,6 @@ async function sharedTeamIdsForProject(projectId) {
   return r.rows
 }
 
-// All projects visible to a user through team membership, joined with where they came from.
-// A project shared into several teams appears once, with a comma-joined team list.
 async function listSharedProjects(userId) {
   const r = await pool.query(
     `SELECT p.id, p.name, p.key_prefix, p.key_rotated_at, p.created_at,
@@ -50,10 +44,6 @@ async function listSharedProjects(userId) {
   return r.rows
 }
 
-// Resolve a project for a user: either they own it, or it is shared into a
-// team they belong to. Returns the project row or null. This is the data-access
-// gate (env, store, cron, monitors, logs) — team MANAGEMENT (sharing, roles,
-// invites) checks roles separately in the team routes.
 async function projectAccessFor(projectId, userId) {
   const r = await pool.query(
     `SELECT p.* FROM projects p

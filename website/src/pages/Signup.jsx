@@ -5,7 +5,7 @@ import { GoogleIcon, GitHubIcon } from '../components/ui/OAuthIcons';
 import CodeSlots from '../components/ui/CodeSlots';import './auth.css';
 
 export default function Signup({ onNavigate }) {
-  const [step, setStep] = useState('details'); // 'details' | 'verify'
+  const [step, setStep] = useState('details');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -56,8 +56,6 @@ export default function Signup({ onNavigate }) {
     }
   };
 
-  // Auto-submitted by CodeSlots onComplete with the just-completed code, or by
-  // the button as a manual fallback. submittingRef guards double submits.
   const submitVerify = async (value) => {
     if (submittingRef.current || !/^\d{6}$/.test(value)) return;
     submittingRef.current = true;
@@ -65,13 +63,12 @@ export default function Signup({ onNavigate }) {
     setSubmitting(true);
     try {
       await api.verifyEmail(pendingToken, value);
-      // Only now does the account actually become a logged-in session.
       login(pendingUser, pendingToken, pendingRefresh);
       goTo('/dashboard');
     } catch (err) {
       submittingRef.current = false;
       setError(err.message || 'Invalid or expired code');
-      setCodeStatus('error'); // CodeSlots drains the digits and clears itself
+      setCodeStatus('error');
     } finally {
       setSubmitting(false);
     }
@@ -79,7 +76,7 @@ export default function Signup({ onNavigate }) {
 
   const handleCodeChange = (value) => {
     setCode(value);
-    if (value === '') setCodeStatus('idle'); // reset after the error drain
+    if (value === '') setCodeStatus('idle');
   };
 
   const resend = async () => {

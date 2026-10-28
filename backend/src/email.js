@@ -12,58 +12,35 @@ const YEAR = new Date().getFullYear()
 
 const escapeHtml = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
-// ---------------------------------------------------------------------------
-// Shared shell — implements /root/dkit-email-kit.html (the design mockup).
-//
-// Light-first: #F4F5F7 canvas, white 12px card, brand green accent
-// (#12b76a buttons with near-black text, #067647 for links and eyebrows —
-// no blue or purple anywhere), and the curved lockup as the header image.
-// Structure is nested presentation tables with
-// everything inline; the <style> block only carries mobile + dark-mode
-// enhancements, so stripping it degrades to a correct light mail.
-//
-// Dark mode is an enhancement layer (Apple Mail / anything honoring
-// prefers-color-scheme): canvas #111418, card #1B1F26, and explicit
-// !important recolors per class — headings, body, code panel, detail table,
-// footer and links are each targeted, so nothing ends up dark-on-dark.
-// Gmail and Outlook keep the light version, which is the intended default.
-//
-// Outlook gets a VML roundrect behind every CTA (mso conditional) plus
-// PixelsPerInch, so Word draws a real rounded button instead of a rectangle.
-//
-// Every mail also carries a plain-text part: one-line intro, the code/link in
-// plain form, expiry. That's what spam filters read and what terminal
-// clients show.
-// ---------------------------------------------------------------------------
 const FONT = `-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`
 const MONO = `'Courier New',Courier,monospace`
 
-const PAGE = '#F4F5F7'      // canvas
-const CARD = '#FFFFFF'      // content card
-const BORDER = '#E5E7EB'    // card border
-const INK = '#111827'       // headings / strong
-const BODY = '#4B5563'      // body copy
-const MUTED = '#6B7280'     // secondary copy
-const FAINT = '#9CA3AF'     // footer copy
-const GREEN_ACCENT = '#12b76a'  // brand green: buttons, wordmark dot (dark text on it)
-const GREEN_INK = '#067647'     // brand green as text: links, eyebrows (5.7:1 on white)
-const GREEN_ON_DARK = '#34d399' // the same role on the dark card
-const GREEN_INFO = '#ECFDF5'    // info box
+const PAGE = '#F4F5F7'
+const CARD = '#FFFFFF'
+const BORDER = '#E5E7EB'
+const INK = '#111827'
+const BODY = '#4B5563'
+const MUTED = '#6B7280'
+const FAINT = '#9CA3AF'
+const GREEN_ACCENT = '#12b76a'
+const GREEN_INK = '#067647'
+const GREEN_ON_DARK = '#34d399'
+const GREEN_INFO = '#ECFDF5'
 const GREEN_INFO_INK = '#065F46'
-const PANEL = '#F8FAFC'     // code panel / detail rows
-const DASH = '#CBD5E1'      // code panel border
-const RED = '#DC2626'       // DOWN
+const PANEL = '#F8FAFC'
+const DASH = '#CBD5E1'
+const RED = '#DC2626'
 const RED_BG = '#FEF2F2'
 const RED_BORDER = '#FECACA'
 const RED_INK = '#7F1D1D'
-const GREEN = '#16A34A'     // UP
+const GREEN = '#16A34A'
 const GREEN_BG = '#F0FDF4'
 const GREEN_BORDER = '#BBF7D0'
 const GREEN_INK_UP = '#14532D'
-const DARK_BTN = '#111827'  // neutral CTA
-const BTN_FG = '#07130e'    // near-black on brand green (7.4:1)
+const DARK_BTN = '#111827'
+const BTN_FG = '#07130e'
 
-const LOGO = `${APP_URL}/dkit-email-header.png`   // brand-green D monogram on transparency — no chip, no border, no fade
+const LOGO = `${APP_URL}/dkit-email-header.png`
 
 const HELP_URL = `${APP_URL}/help`
 const PREFS_URL = `${APP_URL}/settings/email`
@@ -179,14 +156,12 @@ function htmlShell({ title, preheader, eyebrow, eyebrowColor = GREEN_INK, introH
 </html>`
 }
 
-// Inline text links: brand blue with an underline — never default blue.
 const link = (url, label) => `<a href="${escapeHtml(url)}" style="color:${GREEN_INK};text-decoration:underline;">${escapeHtml(label || url)}</a>`
 
 const p = (html) => `<p class="lead" style="margin:0 0 16px;font-family:${FONT};font-size:15px;line-height:24px;color:${BODY};">${html}</p>`
 const dim = (html) => `<p class="note" style="margin:0 0 12px;font-family:${FONT};font-size:13px;line-height:24px;color:${MUTED};">${html}</p>`
 const strong = (html) => `<strong style="color:${INK};font-weight:700;">${html}</strong>`
 
-// Dashed terminal-style chip for 6-digit codes.
 const codeBlock = (code) => `
 <table role="presentation" class="codebox" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 12px;background:${PANEL};border:1px dashed ${DASH};border-radius:10px;"><tr>
   <td align="center" style="padding:22px 16px;">
@@ -194,13 +169,11 @@ const codeBlock = (code) => `
   </td>
 </tr></table>`
 
-// Soft blue note box — "didn't request this?" style reassurance.
 const infoBox = (html) => `
 <table role="presentation" class="info" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 4px;background:${GREEN_INFO};border-radius:8px;"><tr>
   <td style="padding:14px 16px;font-family:${FONT};font-size:13px;line-height:20px;color:${GREEN_INFO_INK};">${html}</td>
 </tr></table>`
 
-// CTA: VML roundrect for Outlook behind a normal inline-styled anchor.
 const button = (url, label, { tone = 'green', width } = {}) => {
   const bg = tone === 'dark' ? DARK_BTN : GREEN_ACCENT
   const fg = tone === 'dark' ? '#FFFFFF' : BTN_FG
@@ -223,7 +196,6 @@ const button = (url, label, { tone = 'green', width } = {}) => {
 </div>`
 }
 
-// Status banner: pill + sentence on a tinted row with a colour rail.
 const statusBanner = ({ tone, label, text }) => {
   const c = tone === 'up'
     ? { bg: GREEN_BG, bd: GREEN_BORDER, rail: GREEN, ink: GREEN_INK_UP }
@@ -237,7 +209,6 @@ const statusBanner = ({ tone, label, text }) => {
 </table>`
 }
 
-// Label/value rows — labels in sans, values in mono (they are data).
 const detailTable = (rows) => `
 <table role="presentation" class="panel" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 20px;background:${CARD};border:1px solid #EEF1F4;border-radius:10px;">
 <tr><td style="padding:6px 18px 18px;">
@@ -268,9 +239,6 @@ async function deliver(to, subject, html, text) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// The mails.
-// ---------------------------------------------------------------------------
 
 function sendVerificationCode(email, code) {
   const html = htmlShell({
@@ -404,8 +372,6 @@ function sendTeamInviteEmail(email, inviteUrl, { teamName = 'a team', inviterEma
   return deliver(email, `You've been invited to join ${teamName} on Dkit`, html, text)
 }
 
-// Uptime alert: sent when a monitor flips down (and again when it recovers).
-// Two visually distinct variants so "back up" reads as good news at a glance.
 function sendUptimeAlertEmail(email, { name, url, status, statusCode, error }) {
   const down = status === 'down'
   const reason = error || (statusCode ? 'HTTP ' + statusCode : 'unknown failure')
@@ -453,8 +419,6 @@ function sendUptimeAlertEmail(email, { name, url, status, statusCode, error }) {
   return deliver(email, (down ? '[DOWN] ' : '[UP] ') + name + ' — Dkit monitor', html, text)
 }
 
-// Welcome mail — sent once right after signup (before verification, so it
-// doubles as confirmation that the address works).
 function sendWelcomeEmail(email) {
   const step = (n, head, sub) => `
   <tr>
@@ -489,7 +453,6 @@ function sendWelcomeEmail(email) {
   return deliver(email, 'Welcome to Dkit', html, text)
 }
 
-// Admin broadcast — drafted in the admin dashboard, sent to users.
 function sendAdminBroadcastEmail(email, { subject, body }) {
   const paragraphs = String(body || '')
     .split(/\n{2,}/)

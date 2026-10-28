@@ -1,8 +1,3 @@
-// Ships logs to Dkit's log drain over HTTP. Enabled whenever DKIT_API_KEY
-// and DKIT_API_URL are present in the environment (dkit run injects them if
-// you set them with: dkit env:set DKIT_API_KEY dk_...  — or export them).
-//
-// Fire-and-forget with a tiny queue: logs never block or crash the app.
 const fs = require('fs')
 const path = require('path')
 

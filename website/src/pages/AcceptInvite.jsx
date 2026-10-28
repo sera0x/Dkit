@@ -18,9 +18,7 @@ export default function AcceptInvite({ onNavigate }) {
 
   useEffect(() => {
     if (!inviteToken) { setError('This link is missing its invitation token.'); setLoading(false); return; }
-    // Keep it across login / signup so we can come straight back here afterwards
     setPendingInvite(inviteToken);
-    // Drop the token from the address bar so it isn't left in history or screenshots
     if (window.location.search) window.history.replaceState({}, '', '/accept-invite');
     let cancelled = false;
     api.previewTeamInvite(inviteToken)

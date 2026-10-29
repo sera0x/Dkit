@@ -13,6 +13,7 @@ const ENTRIES = [
       'Content-Security-Policy enabled and CORS limited to PUBLIC_URL plus local development origins',
       'Project API keys in the dashboard now live in tab memory only, never localStorage',
       'Redesigned marketing site and dashboard chrome: graphite palette, sans-serif UI, self-hosted fonts, no decorative 3D',
+      'Light and dark themes now cross over with a circular reveal from the toggle, disabled under reduced motion',
       'Positioning narrowed to secrets and runtime config; cron, monitors, and logs are secondary',
       'CLI 2.0: `env:set` now defaults to production like the rest of the env commands',
       'Dependency audit: zero known vulnerabilities in backend and website production trees',

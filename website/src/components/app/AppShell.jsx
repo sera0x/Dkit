@@ -1,8 +1,10 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Menu, X, LogOut, Sun, Moon, LayoutGrid, BookOpen, Wrench } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import logo from '../../assets/dkit-logo.png';
 import { applyChromeTheme, syncChrome, nudgeBrowserChrome } from '../../lib/browserChrome';
+import { runThemeTransition } from '../../lib/themeTransition';
 import '../../pages/dashboard.css';
 import '../../pages/render-look.css';
 
@@ -37,7 +39,11 @@ export default function AppShell({ active, onNavigate, primaryNav, children }) {
     return nudgeBrowserChrome({ keepPosition: true });
   }, [theme]);
 
-  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
+  const toggleTheme = (event) => {
+    runThemeTransition(() => {
+      flushSync(() => setTheme((t) => (t === 'dark' ? 'light' : 'dark')));
+    }, event);
+  };
 
   const closeDrawer = () => {
     if (drawerTimer.current) return;

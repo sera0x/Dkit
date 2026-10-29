@@ -1,6 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Sun, Moon } from 'lucide-react';
 import { applyChromeTheme, syncChrome, nudgeBrowserChrome } from '../../lib/browserChrome';
+import { runThemeTransition } from '../../lib/themeTransition';
 
 export const MarketingThemeContext = React.createContext('dark');
 
@@ -11,7 +13,11 @@ function useTheme() {
   useEffect(() => {
     try { localStorage.setItem('dkit_theme', theme); } catch {  }
   }, [theme]);
-  const toggle = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
+  const toggle = (event) => {
+    runThemeTransition(() => {
+      flushSync(() => setTheme((t) => (t === 'dark' ? 'light' : 'dark')));
+    }, event);
+  };
   return [theme, toggle];
 }
 

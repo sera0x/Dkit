@@ -1,6 +1,11 @@
 .terminal-window {
-  background: #0d0f12;
-  border: 1px solid var(--border);
+  --terminal-bg: #0d0f12;
+  --terminal-titlebar: #14171b;
+  --terminal-border: rgba(255, 255, 255, 0.10);
+  --terminal-text: #e7eaee;
+  --terminal-faint: #858c94;
+  background: var(--terminal-bg);
+  border: 1px solid var(--terminal-border);
   border-radius: 8px;
   overflow: hidden;
   font-family: var(--font-mono);
@@ -11,8 +16,8 @@
   align-items: center;
   gap: 0.4rem;
   padding: 0.75rem 1rem;
-  background: #14171b;
-  border-bottom: 1px solid var(--border);
+  background: var(--terminal-titlebar);
+  border-bottom: 1px solid var(--terminal-border);
 }
 
 .terminal-dot {
@@ -36,7 +41,7 @@
 .terminal-titlebar-label {
   margin-left: 0.5rem;
   font-size: 0.75rem;
-  color: var(--text-faint);
+  color: var(--terminal-faint);
 }
 
 .terminal-body {
@@ -46,7 +51,7 @@
   overflow-y: auto;
   font-size: 0.85rem;
   line-height: 1.7;
-  color: var(--text);
+  color: var(--terminal-text);
 }
 
 .terminal-line {

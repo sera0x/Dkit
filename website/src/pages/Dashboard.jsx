@@ -197,7 +197,7 @@ const maskKey = (key) => {
 const bullets = (v) => '•'.repeat(Math.max(4, Math.min(String(v ?? '').length, 16)));
 
 export default function Dashboard({ onNavigate }) {
-  const { user, token, refreshToken, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const [section, setSection] = useState(() => {
     const wanted = takeDashboardSection();
     return NAV_ITEMS.some((n) => n.id === wanted && n.id !== 'admin') ? wanted : 'overview';
@@ -305,10 +305,10 @@ export default function Dashboard({ onNavigate }) {
   }, [token]);
 
   const loadSessions = useCallback(async () => {
-    try { setSessions(await api.getSessions(token, refreshToken)); }
+    try { setSessions(await api.getSessions(token)); }
     catch { setSessions([]); }
     finally { setSessionsLoading(false); }
-  }, [token, refreshToken]);
+  }, [token]);
 
   useEffect(() => { loadVerification(); loadProjects(); loadTeamInvites(); loadSessions(); }, [loadVerification, loadProjects, loadTeamInvites, loadSessions]);
   useEffect(() => {
@@ -461,7 +461,7 @@ export default function Dashboard({ onNavigate }) {
   };
 
   const revokeOthers = async () => {
-    try { await api.revokeOtherSessions(token, refreshToken); loadSessions(); }
+    try { await api.revokeOtherSessions(token); loadSessions(); }
     catch (err) { setCreateError(err.message); }
   };
 
@@ -513,7 +513,7 @@ export default function Dashboard({ onNavigate }) {
             shared
           </span>
         )}
-        <code className="project-key" title={p.key_prefix ? (saved ? 'Saved in this browser\'s key vault' : 'Key not saved in this browser: tap the eye to add it') : 'No API key yet. Dashboard access works without one; create a key for CLI/API use'}>
+        <code className="project-key" title={p.key_prefix ? (saved ? "Kept in this tab's memory" : 'Key not in this tab: tap the eye to add it') : 'No API key yet. Dashboard access works without one; create a key for CLI/API use'}>
           {p.key_prefix ? (revealed ? saved : p.key_prefix + '…') : 'no api key'}
         </code>
         <span className="secrets-acts">
@@ -528,7 +528,7 @@ export default function Dashboard({ onNavigate }) {
             </button>
           )}
           {!!p.key_prefix && (
-            <button className="icon-btn" aria-label="Copy API key" title={saved ? 'Copy key' : 'Key not saved in this browser: click the eye to paste it once'} onClick={() => copyProjectKey(p)}>
+            <button className="icon-btn" aria-label="Copy API key" title={saved ? 'Copy key' : 'Key not in this tab: click the eye to paste it once'} onClick={() => copyProjectKey(p)}>
               {copiedTag === 'api:' + p.id ? <Check width="14" height="14" /> : copyHint === p.id ? <Info width="14" height="14" /> : <Copy width="14" height="14" />}
             </button>
           )}
@@ -555,7 +555,7 @@ export default function Dashboard({ onNavigate }) {
           <div className="paste-key-row">
             <p className="paste-key-hint">
               {p.is_shared
-                ? 'Keys are stored hashed, so Dkit can never show one, not even to the owner. Paste the key shared with you once; it stays in this browser only.'
+                ? "Keys are stored hashed, so Dkit can never show one, not even to the owner. Paste the key shared with you once; it stays in this tab's memory and is cleared on reload."
                 : 'Keys are stored hashed, so Dkit can never show one, not even yours. Paste the key from when you created it, or rotate to get a new one.'}
             </p>
             <input
@@ -566,7 +566,7 @@ export default function Dashboard({ onNavigate }) {
               onKeyDown={(e) => { if (e.key === 'Enter') savePastedKey(p); }}
               autoFocus
             />
-            <button className="cta-button primary btn-sm" onClick={() => savePastedKey(p)}>save to vault</button>
+            <button className="cta-button primary btn-sm" onClick={() => savePastedKey(p)}>keep for this tab</button>
             <button className="breadcrumb-back" onClick={() => { setPasteFor(null); setPasteValue(''); setPasteError(''); }}>cancel</button>
           </div>
         )}
@@ -574,8 +574,8 @@ export default function Dashboard({ onNavigate }) {
         {copyHint === p.id && (
           <p className="page-header-sub" style={{ width: '100%' }}>
             {p.is_shared
-              ? 'No key saved in this browser. Click the eye to paste the one that was shared with you.'
-              : 'Key not saved in this browser. Click the eye to paste it once, or rotate to get a new key.'}
+              ? 'No key in this tab. Click the eye to paste the one that was shared with you.'
+              : 'Key not in this tab. Click the eye to paste it once, or rotate to get a new key.'}
           </p>
         )}
       </div>

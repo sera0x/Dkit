@@ -11,7 +11,7 @@
   max-width: 26rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 2rem;
 }
 
@@ -87,7 +87,7 @@
 }
 
 .auth-error {
-  color: #ff6b6b;
+  color: var(--danger);
   font-size: 0.85rem;
   margin: 0;
 }
@@ -101,7 +101,7 @@
 }
 
 .auth-error-list {
-  color: #ff6b6b;
+  color: var(--danger);
   font-size: 0.85rem;
   margin: -0.5rem 0 0;
   padding-left: 1.2rem;
@@ -195,7 +195,7 @@
 }
 
 .marketing-shell[data-theme='light'] .code-slots {
-  --cs-accent: #0a8447;
+  --cs-accent: var(--accent);
   --cs-digit: #ffffff;
   --cs-slot: #eef0ec;
   --cs-ink: #101410;

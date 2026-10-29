@@ -1,50 +1,49 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { api, AUTH_CHANGED_EVENT } from '../lib/api';
+import { api, restoreSession, setAccessToken, getAccessToken, AUTH_CHANGED_EVENT } from '../lib/api';
 
 const AuthContext = createContext(null);
-const STORAGE_KEY = 'dkit_auth';
-
-function loadStored() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
 
 export function AuthProvider({ children }) {
-  const [auth, setAuth] = useState(loadStored);
+  const [auth, setAuth] = useState({ user: null, token: null });
+  const [booting, setBooting] = useState(true);
 
   useEffect(() => {
-    const sync = () => setAuth(loadStored());
-    window.addEventListener(AUTH_CHANGED_EVENT, sync);
-    window.addEventListener('storage', sync);
-    return () => {
-      window.removeEventListener(AUTH_CHANGED_EVENT, sync);
-      window.removeEventListener('storage', sync);
-    };
+    let cancelled = false;
+    restoreSession()
+      .then((restored) => {
+        if (cancelled) return;
+        if (restored?.token) setAuth({ user: restored.user, token: restored.token });
+      })
+      .finally(() => { if (!cancelled) setBooting(false); });
+    return () => { cancelled = true; };
   }, []);
 
-  const login = useCallback((user, token, refreshToken) => {
-    const next = { user, token, refresh_token: refreshToken || null };
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {  }
-    setAuth(next);
+  useEffect(() => {
+    const sync = () => {
+      const token = getAccessToken();
+      setAuth((prev) => (token ? { ...prev, token } : { user: null, token: null }));
+    };
+    window.addEventListener(AUTH_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(AUTH_CHANGED_EVENT, sync);
+  }, []);
+
+  const login = useCallback((user, token) => {
+    setAccessToken(token, user);
+    setAuth({ user, token });
   }, []);
 
   const logout = useCallback(() => {
-    const current = loadStored();
-    if (current?.refresh_token) api.logout(current.refresh_token);
-    try { localStorage.removeItem(STORAGE_KEY); } catch {  }
-    setAuth(null);
+    api.logout();
+    setAccessToken(null, null);
+    setAuth({ user: null, token: null });
   }, []);
 
   return (
     <AuthContext.Provider
       value={{
-        user: auth?.user || null,
-        token: auth?.token || null,
-        refreshToken: auth?.refresh_token || null,
+        user: auth.user,
+        token: auth.token,
+        booting,
         login,
         logout,
       }}

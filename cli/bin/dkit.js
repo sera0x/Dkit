@@ -11,6 +11,7 @@ const { scaffold } = require('../lib/scaffold')
 const { deriveNames, validateNpmName } = require('../lib/names')
 const CONFIG_PATH = path.join(os.homedir(), '.dkitrc')
 const API_BASE = process.env.DKIT_API_URL || 'https://dkit.name.ng'
+axios.defaults.headers.common['x-dkit-client'] = 'cli'
 function loadConfig() { try { const raw = fs.readFileSync(CONFIG_PATH, 'utf8'); return JSON.parse(raw) } catch { return {} } }
 function saveConfig(config) { fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), { mode: 0o600 }); try { fs.chmodSync(CONFIG_PATH, 0o600) } catch {} }
 function getApiClient(apiKey) { return axios.create({ baseURL: API_BASE, headers: { 'x-api-key': apiKey, 'x-dkit-actor': loadConfig().user?.email || '' } }) }
@@ -46,7 +47,7 @@ const getUserToken = ensureSession
 function maskKey(key) { if (!key) return 'dk_…'; if (key.length < 10) return key + '…'; return key.slice(0, 6) + '…' + key.slice(-4) }
 function findLinkState(dir) { let cur = dir || process.cwd(); while (true) { const p = path.join(cur, '.dkit', 'state.json'); if (fs.existsSync(p)) { try { return JSON.parse(fs.readFileSync(p, 'utf8')) } catch { return null } } const parent = path.dirname(cur); if (parent === cur) return null; cur = parent } }
 function getProjectApiKey() { const config = loadConfig(); const state = findLinkState(); if (state && state.project) { const key = config.apiKeys && config.apiKeys[state.project]; if (key) return key; console.log(chalk.yellow('This folder is linked to "' + state.project + '" but no API key for it is cached on this machine. Run: dkit projects:list')); process.exit(1) } if (!config.currentProject || !config.apiKeys) { console.log(chalk.red('No project selected. Run: dkit projects:list')); process.exit(1) } return config.apiKeys[config.currentProject] }
-program.name('dkit').description('Dkit CLI - Developer Toolkit').version('0.3.0')
+program.name('dkit').description('Dkit CLI - secrets and runtime config').version('2.0.0')
 program.command('login').description('Login to Dkit').action(async () => {
 const { email, password } = await inquirer.prompt([{ type: 'input', name: 'email', message: 'Email:' }, { type: 'password', name: 'password', message: 'Password:' }])
 const spinner = ora('Initiating login...').start()
@@ -150,7 +151,7 @@ if (selected && selected !== 'Cancel') { config.currentProject = selected; saveC
 }
 } catch (error) { spinner.fail('Failed to load projects'); console.log(chalk.red(error.response?.data?.error || error.message)) }
 })
-program.command('env:set <key> <value>').description('Set an environment variable').option('-e, --env <environment>', 'Environment (development/staging/production)', 'development').action(async (key, value, options) => {
+program.command('env:set <key> <value>').description('Set an environment variable').option('-e, --env <environment>', 'Environment (development/staging/production)', 'production').action(async (key, value, options) => {
 const apiKey = getProjectApiKey(); const client = getApiClient(apiKey); const spinner = ora('Setting ' + key + '...').start()
 try { await client.post('/api/env', { key, value, environment: options.env }); spinner.succeed(key + ' set for ' + options.env) } catch (error) { spinner.fail('Failed to set environment variable'); console.log(chalk.red(error.response?.data?.error || error.message)) }
 })

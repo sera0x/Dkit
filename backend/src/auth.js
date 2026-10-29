@@ -22,8 +22,8 @@ async function verifyPassword(password, hash) {
 
 const ACCESS_TOKEN_TTL = '15m'
 
-function generateToken(userId) {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL })
+function generateToken(userId, sessionId) {
+  return jwt.sign({ userId, ...(sessionId ? { sid: sessionId } : {}) }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL })
 }
 
 function newRefreshToken() {
@@ -72,6 +72,7 @@ async function authenticate(req, res, next) {
     }
 
     req.user = user.rows[0]
+    req.sessionId = decoded.sid || null
     next()
   } catch (err) {
     console.error('Authentication Error:', err)

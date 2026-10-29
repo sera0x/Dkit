@@ -1,21 +1,34 @@
 
-const STORAGE_KEY = 'dkit_auth';
 const EXPIRED_FLAG = 'dkit_session_expired';
 export const AUTH_CHANGED_EVENT = 'dkit_auth_changed';
 
-function readAuth() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+let accessToken = null;
+let currentUser = null;
+
+export function setAccessToken(token, user) {
+  accessToken = token || null;
+  if (token) expiryHandled = false;
+  if (user !== undefined) currentUser = user || null;
 }
 
-function writeAuth(auth) {
+export function getAccessToken() {
+  return accessToken;
+}
+
+function readCookie(name) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
+    const prefix = name + '=';
+    for (const part of document.cookie.split(';')) {
+      const value = part.trim();
+      if (value.startsWith(prefix)) return decodeURIComponent(value.slice(prefix.length));
+    }
   } catch {  }
+  return '';
+}
+
+function csrfHeader() {
+  const token = readCookie('dkit_csrf');
+  return token ? { 'x-csrf-token': token } : {};
 }
 
 function notifyAuthChanged() {
@@ -25,28 +38,24 @@ function notifyAuthChanged() {
 }
 
 let refreshPromise = null;
-function refreshSession() {
+export function refreshSession() {
   if (refreshPromise) return refreshPromise;
   refreshPromise = (async () => {
-    const current = readAuth();
-    if (!current?.refresh_token) return null;
     try {
       const res = await fetch('/api/auth/refresh', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: current.refresh_token }),
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', ...csrfHeader() },
+        body: '{}',
       });
-      if (!res.ok) return null;
+      if (!res.ok) { accessToken = null; return null; }
       const data = await res.json();
-      writeAuth({
-        ...current,
-        token: data.token,
-        refresh_token: data.refresh_token,
-        user: data.user || current.user,
-      });
+      accessToken = data.token || null;
+      currentUser = data.user || currentUser;
       notifyAuthChanged();
       return data;
     } catch {
+      accessToken = null;
       return null;
     } finally {
       refreshPromise = null;
@@ -55,11 +64,21 @@ function refreshSession() {
   return refreshPromise;
 }
 
+export async function restoreSession() {
+  if (!readCookie('dkit_csrf')) return null;
+  const data = await refreshSession();
+  if (!data?.token) return null;
+  accessToken = data.token;
+  currentUser = data.user || null;
+  return { user: data.user || null, token: data.token };
+}
+
 let expiryHandled = false;
 function sessionExpired() {
   if (expiryHandled) return;
   expiryHandled = true;
-  try { localStorage.removeItem(STORAGE_KEY); } catch {  }
+  accessToken = null;
+  currentUser = null;
   try { sessionStorage.setItem(EXPIRED_FLAG, '1'); } catch {  }
   notifyAuthChanged();
   if (!window.location.pathname.startsWith('/login')) {
@@ -78,12 +97,13 @@ export function consumeSessionExpired() {
 }
 
 async function request(path, options = {}) {
-  const current = readAuth();
   const res = await fetch(`/api${path}`, {
     ...options,
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
-      ...(current?.user?.email ? { 'x-dkit-actor': current.user.email } : {}),
+      ...(currentUser?.email ? { 'x-dkit-actor': currentUser.email } : {}),
+      ...(accessToken && !options.headers?.Authorization ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...(options.headers || {}),
     },
   });
@@ -95,14 +115,7 @@ async function request(path, options = {}) {
   if (res.status === 401 && data?.code === 'token_expired' && !options.__retried) {
     const refreshed = await refreshSession();
     if (refreshed) {
-      return request(path, {
-        ...options,
-        __retried: true,
-        headers: {
-          ...(options.headers || {}),
-          Authorization: `Bearer ${refreshed.token}`,
-        },
-      });
+      return request(path, { ...options, __retried: true });
     }
     sessionExpired();
   }
@@ -122,28 +135,21 @@ const projectAuth = (token, projectId) => ({
   'x-project-id': projectId,
 });
 
-const VAULT_KEY = 'dkit_key_vault';
+const VAULT = new Map();
 export function readKeyVault() {
-  try { return JSON.parse(localStorage.getItem(VAULT_KEY)) || {} } catch { return {} }
-}
-function writeVault(vault) {
-  try { localStorage.setItem(VAULT_KEY, JSON.stringify(vault)) } catch {  }
+  return Object.fromEntries(VAULT);
 }
 export function saveKeyToVault(projectId, apiKey) {
   if (!projectId || !apiKey) return;
-  const vault = readKeyVault();
-  vault[projectId] = apiKey;
-  writeVault(vault);
+  VAULT.set(projectId, apiKey);
 }
 export function forgetKeyInVault(projectId) {
-  const vault = readKeyVault();
-  delete vault[projectId];
-  writeVault(vault);
+  VAULT.delete(projectId);
 }
 export const vault = { read: readKeyVault, save: saveKeyToVault, forget: forgetKeyInVault };
 export const api = {
-logout: (refreshToken) =>
-request('/auth/logout', { method: 'POST', body: JSON.stringify({ refresh_token: refreshToken }) }).catch(() => {}),
+logout: () =>
+request('/auth/logout', { method: 'POST', body: '{}', headers: csrfHeader() }).catch(() => {}),
 signup: (email, password) =>
 request('/auth/signup', { method: 'POST', body: JSON.stringify({ email, password }) }),
 loginInitiate: (email, password) =>
@@ -216,21 +222,19 @@ createProjectApiKey: (token, id) =>
 request(`/projects/${id}/api-key`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }),
 revokeProjectApiKey: (token, id) =>
 request(`/projects/${id}/api-key`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }),
-getSessions: (token, refreshToken) =>
+getSessions: (token) =>
 request('/auth/sessions', {
 headers: {
 Authorization: `Bearer ${token}`,
-...(refreshToken ? { 'x-session-token': refreshToken } : {}),
 },
 }),
 revokeSession: (token, id) =>
 request(`/auth/sessions/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }),
-revokeOtherSessions: (token, refreshToken) =>
+revokeOtherSessions: (token) =>
 request('/auth/sessions/revoke-others', {
 method: 'POST',
 headers: {
 Authorization: `Bearer ${token}`,
-...(refreshToken ? { 'x-session-token': refreshToken } : {}),
 },
 }),
 projectEnv: (token, projectId, environment) =>

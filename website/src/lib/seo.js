@@ -4,12 +4,12 @@ const SITE = SITE_URL;
 
 const PAGES = {
   '/': {
-    title: 'Dkit: secrets, cron and monitors, self-hosted',
-    description: 'Self-hosted secrets manager with a CLI, dashboard and API. Run commands with env vars injected, schedule HTTP calls, watch URLs, and ship logs. Free while in beta.',
+    title: 'Dkit: secrets and runtime config without the .env file',
+    description: 'Self-hosted secrets manager with a CLI and dashboard. Keep values per environment, encrypted at rest, and inject them at runtime. No .env file on disk.',
   },
   '/docs': {
-    title: 'Dkit docs: CLI, API and self-hosting reference',
-    description: 'Every dkit command, the HTTP API, env var rules, cron syntax and a self-hosting guide.',
+    title: 'Dkit docs: CLI, API and security reference',
+    description: 'Every dkit command, the HTTP API, env var rules, cron syntax, and how sessions and secrets are protected.',
   },
   '/changelog': {
     title: 'Dkit changelog',

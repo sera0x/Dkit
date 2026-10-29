@@ -87,7 +87,7 @@
   align-items: center;
   gap: 0.35rem;
   font-size: 0.82rem;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -97,7 +97,7 @@
 }
 
 .tool-btn {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 0.82rem;
   color: var(--text-muted);
   background: none;

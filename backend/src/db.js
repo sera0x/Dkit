@@ -86,6 +86,8 @@ await pool.query(`CREATE TABLE IF NOT EXISTS sessions (
 )`)
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id)`)
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_sessions_hash ON sessions (refresh_hash)`)
+await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS prev_refresh_hash TEXT`)
+await pool.query(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS prev_valid_until TIMESTAMP`)
 await pool.query(`CREATE TABLE IF NOT EXISTS env_history (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), project_id UUID REFERENCES projects(id) ON DELETE CASCADE, key TEXT NOT NULL, environment TEXT NOT NULL, old_value TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW())`)
 await pool.query(`CREATE INDEX IF NOT EXISTS idx_env_history_lookup ON env_history(project_id, key, environment, created_at DESC)`)
 await pool.query(`ALTER TABLE env_history ADD COLUMN IF NOT EXISTS action TEXT DEFAULT 'set'`)

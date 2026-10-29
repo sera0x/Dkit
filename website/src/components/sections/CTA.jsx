@@ -1,21 +1,36 @@
 import React from 'react';
-import GradientWaves from '../ui/GradientWaves';
-import Shuffle from '../ui/Shuffle';
+import { ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { MarketingThemeContext } from '../app/MarketingShell';
 import './sections.css';
+
 const CTA = ({ onNavigate }) => {
-const { user } = useAuth();
-const theme = React.useContext(MarketingThemeContext);
-return (
-<section className="cta-section" id="pricing">
-<div className="cta-background"><GradientWaves key={theme} horizonColor={theme === 'light' ? '#ffffff' : '#050606'} waveColor={theme === 'light' ? '#e4f3ea' : '#0f1a13'} crestColor={theme === 'light' ? '#0a8447' : '#39ff88'} speed={0.2} amplitude={1.5} opacity={0.5} /></div>
-<div className="cta-content">
-<Shuffle text="Create an account" shuffleDirection="up" duration={0.4} shuffleTimes={2} triggerOnce={true} triggerOnHover={true} tag="h2" textAlign="center" />
-<p className="cta-sub">Free while in beta. No card required.</p>
-<button className="cta-button primary" onClick={() => { const target = user ? '/dashboard' : '/signup'; onNavigate ? onNavigate(target) : (window.location.href = target); }}>Create Free Account</button>
-</div>
-</section>
-);
+  const { user } = useAuth();
+  const go = (path) => {
+    if (onNavigate) onNavigate(path);
+    else window.location.href = path;
+  };
+
+  return (
+    <section className="section cta" id="start">
+      <div className="section-inner">
+        <div className="cta-panel">
+          <div>
+            <h2>Stop committing secrets.</h2>
+            <p>Create a free account, or run Dkit on your own server. Both use the same CLI.</p>
+          </div>
+          <div className="cta-actions">
+            <button className="btn btn-primary" onClick={() => go(user ? '/dashboard' : '/signup')}>
+              {user ? 'Open dashboard' : 'Create free account'}
+              <ArrowRight width="16" height="16" />
+            </button>
+            <a className="btn btn-ghost" href="/docs" onClick={(e) => { e.preventDefault(); go('/docs'); }}>
+              Read the docs
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 };
+
 export default CTA;

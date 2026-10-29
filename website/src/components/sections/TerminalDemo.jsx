@@ -1,48 +1,42 @@
 import React from 'react';
 import { Terminal } from '../ui/Terminal';
-import SlicedWaves from '../ui/SlicedWaves';
-import { MarketingThemeContext } from '../app/MarketingShell';
 import './sections.css';
 
-const TerminalDemo = () => {
-  const theme = React.useContext(MarketingThemeContext);
-  return (
-    <section className="terminal-section" id="demo">
-      <div className="terminal-background">
-        <SlicedWaves
-          key={theme}
-          color1={theme === 'light' ? '#0a8447' : '#39ff88'}
-          color2={theme === 'light' ? '#57c98d' : '#1f9955'}
-          color3={theme === 'light' ? '#dcf2e4' : '#0b3a20'}
-          columns={12}
-          rows={6}
-          barThickness={0.15}
-          speed={0.25}
-          opacity={0.3}
-          mouseInteraction={true}
-        />
+const TerminalDemo = () => (
+  <section className="section cli" id="cli">
+    <div className="section-inner cli-inner">
+      <div className="cli-copy">
+        <h2>Four commands, no .env.</h2>
+        <p>
+          The CLI is the same API the dashboard uses. Log in once, link a project,
+          and run. Nothing is written to disk except the project link.
+        </p>
+        <ul className="cli-list">
+          <li><code>dkit new</code> scaffolds a backend and links it to a project.</li>
+          <li><code>dkit env:set</code> writes a value to one environment.</li>
+          <li><code>dkit run</code> injects the values into any command.</li>
+        </ul>
       </div>
-      <div className="terminal-content">
-        <h2>The workflow</h2>
+      <div className="cli-terminal">
         <Terminal
           commands={[
-            "dkit new payments-api --template express-pg",
-            "cd payments-api && npm install",
-            "dkit env:set DATABASE_URL postgres://... -e production",
-            "npm run dev",
+            'dkit login',
+            'dkit new payments-api --template express-pg',
+            'dkit env:set DATABASE_URL postgres://… -e production',
+            'dkit run -- npm start',
           ]}
           outputs={{
-            0: ["✓ Created Dkit project \"payments-api\"", "✓ Scaffolded 14 files from express-pg"],
-            1: ["added 62 packages in 3s"],
-            2: ["✓ DATABASE_URL set for production"],
-            3: ["Server running on :3000", "(no .env file was created)"],
+            0: ['✓ Logged in as you@example.com'],
+            1: ['✓ Created project "payments-api"', '✓ Scaffolded 14 files'],
+            2: ['✓ DATABASE_URL set for production'],
+            3: ['✓ 12 secrets injected', 'Server listening on :3000'],
           }}
-          typingSpeed={40}
-          delayBetweenCommands={600}
+          typingSpeed={28}
+          delayBetweenCommands={500}
         />
       </div>
-    </section>
-  );
-};
+    </div>
+  </section>
+);
 
 export default TerminalDemo;

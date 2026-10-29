@@ -41,6 +41,7 @@ skills-lock.json
 /dkit-style-guide.md
 /MIGRATION.md
 /CHANGES.md
+/TUNNEL-PLAN.md
 /VPS-SETUP.md
 /VPS-SETUP-BUN.md
 /scripts/migrate-export.sh

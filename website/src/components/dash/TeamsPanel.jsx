@@ -325,11 +325,11 @@ export default function TeamsPanel({ token, user, invites = [], projects = [], o
                         </div>
                         <span className="secrets-acts" onClick={(e) => e.stopPropagation()}>
                           {keyAvailable ? (
-                            <button className="icon-btn" aria-label="Copy API key from this browser's vault" title="Copy key (saved in this browser)" onClick={() => copySharedKey(p)}>
+                            <button className="icon-btn" aria-label="Copy API key kept in this tab" title="Copy key (kept in this tab)" onClick={() => copySharedKey(p)}>
                               {copied === 'tp:' + p.id ? <Check width="14" height="14" /> : <Copy width="14" height="14" />}
                             </button>
                           ) : (
-                            <span className="key-ghost" title="Key stored hashed: only someone who saved it in their browser can copy it here. Ask the owner to share it directly or rotate it.">
+                            <span className="key-ghost" title="Key stored hashed: only someone who kept it in this tab can copy it here. Ask the owner to share it directly or rotate it.">
                               <KeyRound width="13" height="13" /> key not in vault
                             </span>
                           )}

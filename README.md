@@ -4,20 +4,22 @@
 
 <h1 align="center">Dkit</h1>
 
-<p align="center"><strong>Secrets, cron jobs, uptime checks, a log drain, a JSON store, a Redis cache, and an image CDN — one CLI, one dashboard, one API. Self-hosted.</strong></p>
+<p align="center"><strong>Secrets and runtime config for small teams. Per-environment values, encrypted at rest, injected at runtime. Self-hosted, one CLI, one dashboard, one API.</strong></p>
 
 <p align="center">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-0c111d">
   <img alt="Node" src="https://img.shields.io/badge/node-%E2%89%A518-339933?logo=node.js&logoColor=white">
-  <img alt="Express" src="https://img.shields.io/badge/express-4-000000?logo=express&logoColor=white">
-  <img alt="React" src="https://img.shields.io/badge/react-18-149ECA?logo=react&logoColor=white">
+  <img alt="Express" src="https://img.shields.io/badge/express-5-000000?logo=express&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/react-19-149ECA?logo=react&logoColor=white">
   <img alt="Postgres" src="https://img.shields.io/badge/postgres-14%2B-4169E1?logo=postgresql&logoColor=white">
   <img alt="Redis" src="https://img.shields.io/badge/redis-6%2B-DC382D?logo=redis&logoColor=white">
 </p>
 
 ---
 
-Dkit is the boring-infrastructure layer for side projects: secrets per environment, scheduled HTTP jobs, URL monitors that email you once when they go down, a place for apps to ship logs, and a small JSON store. The `dkit` CLI, the React dashboard, and the plain HTTP API all talk to the same backend.
+Dkit replaces the `.env` file you copy between machines, paste into chat, and eventually commit by mistake. Values live per project and environment, are encrypted at rest, and are injected into your process when it starts. The `dkit` CLI, the React dashboard, and the plain HTTP API all talk to the same backend.
+
+Cron jobs, uptime monitors, and a log drain live in the same box. They are useful, but you do not need them to use the secrets part.
 
 ```bash
 curl -fsSL https://dkit.name.ng/install.sh | sh
@@ -49,19 +51,21 @@ OAuth (Google, GitHub) stays hidden until both ID and secret are set. Media uplo
 
 Set `PUBLIC_URL` in `backend/.env` to your public origin, and build the dashboard with `VITE_SITE_URL` set to the same origin, so OAuth callbacks, invite links and canonical URLs agree. Without `VITE_SITE_URL` the dashboard uses the origin it is served from. A minimal Cloudflare Tunnel ingress is in [`deploy/cloudflared/config.example.yml`](deploy/cloudflared/config.example.yml).
 
-## What's in it
+## What it does
 
 - **Secrets are encrypted at rest.** Env values, env history and TOTP secrets are AES-256-GCM encrypted with `DKIT_ENCRYPTION_KEY`. API keys and refresh tokens are SHA-256 hashes; the plaintext exists only in the response that issued them. Env listings are masked server-side; `env:get` reveals one value, and the history API returns value lengths instead of values.
 - **Environments are first-class.** `development`, `staging`, `production`, or your own names — separate secret sets per project. `env:diff`, `env:copy`, `env:rollback <key>`.
 - **No `.env` on disk.** `dkit run -- npm start` injects secrets into the child process and exits with its status. `env:pull > .env` exists when you do want the file.
+- **Browser sessions stay out of JavaScript.** The refresh token lives in an httpOnly, SameSite=Lax cookie scoped to `/api/auth`; the access token stays in memory. Refresh and logout require a CSRF token, and the API sends a restrictive CSP. The CLI keeps using bearer tokens.
+- **Teams.** Owner/admin/member roles, projects shared into a team, invitations that only work for a verified address.
+- **Destructive actions type-to-confirm.** Projects and secrets confirm through a prompt, like a terminal.
+
+The rest of the box, when you want it:
+
 - **Cron is human strings.** `30s`, `5m`, `daily 09:30`, `mon 09:00`, all UTC, 10-second floor. The API fires the HTTP calls, keeps run history, and can pause or run a job on demand.
 - **Monitors email once.** One alert when a URL goes down, one when it recovers. Granularity from 30 seconds to an hour.
 - **Log drain accepts anything that can POST.** Ship lines or JSON batches; tail with level and search filters; 7-day retention.
-- **A JSON key-value store** with optional TTL and atomic increments — for state that isn't a secret.
-- **A Redis-backed cache** — plain strings, atomic `INCR`, TTLs and prefix listing. Sub-millisecond, but deliberately evictable (64 MB, LRU): sessions, counters and hot reads, not the only copy of anything.
-- **An image/file CDN on Cloudflare R2.** Upload once, get an unguessable URL served by Cloudflare — the VPS holds bytes only in transit. `dkit upload logo.png` keeps a file; `dkit share shot.png --ttl 15m` makes a self-destructing test link that vanishes object-first from the bucket.
-- **Teams.** Owner/admin/member roles, projects shared into a team, invitations that only work for a verified address.
-- **Destructive actions type-to-confirm.** Projects and secrets confirm through a prompt, like a terminal.
+- **Also from the CLI:** a JSON key-value store with TTL and atomic increments, a deliberately evictable Redis cache, and R2-backed media uploads with temporary share links.
 
 ## How it fits together
 
@@ -115,7 +119,7 @@ Full reference lives at `/docs` on your deployment.
 
 ## Security, briefly
 
-Env values, env history and TOTP secrets are AES-256-GCM encrypted at rest with `DKIT_ENCRYPTION_KEY`. API keys and refresh tokens are stored as SHA-256 hashes; refresh tokens rotate on every use. Env listings are masked server-side, the history API returns value lengths, and one-time codes and invitations are rate-limited.
+Env values, env history and TOTP secrets are AES-256-GCM encrypted at rest with `DKIT_ENCRYPTION_KEY`. API keys and refresh tokens are stored as SHA-256 hashes, and refresh tokens rotate on every use. Browser sessions use an httpOnly refresh cookie, an in-memory access token, and a double-submit CSRF token; the CLI keeps bearer auth. Responses carry a restrictive Content-Security-Policy, and CORS accepts only `PUBLIC_URL` plus local development origins. Env listings are masked server-side, the history API returns value lengths, and one-time codes and invitations are rate-limited.
 
 ## License
 

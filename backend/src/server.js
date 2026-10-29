@@ -12,6 +12,7 @@ const { isTeamMember, isTeamWriteable, projectAccessFor, sharedTeamIdsForProject
 const r2 = require('./r2')
 const { generateSecret, verifyTotp, otpauthUrl } = require('./totp')
 const { encryptSecret, decryptSecret } = require('./secrets')
+const { REFRESH_COOKIE, CSRF_COOKIE, parseCookies, setSessionCookies, clearSessionCookies, csrfIsValid, wantsCliToken } = require('./cookies')
 const crypto = require('crypto')
 const app = express()
 async function loadSelfSettings() {
@@ -44,20 +45,60 @@ async function ensureSelfProject() {
   }
 }
 app.set('trust proxy', 1)
-app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } }))
-app.use(cors())
+const isHttps = /^https:\/\//i.test(process.env.PUBLIC_URL || '')
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      formAction: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      fontSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'"],
+      manifestSrc: ["'self'"],
+      ...(isHttps ? { upgradeInsecureRequests: [] } : { upgradeInsecureRequests: null }),
+    },
+  },
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginOpenerPolicy: { policy: 'same-origin' },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}))
+const corsOrigins = new Set()
+if (process.env.PUBLIC_URL) corsOrigins.add(String(process.env.PUBLIC_URL).replace(/\/+$/, ''))
+for (const origin of ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3001', 'http://127.0.0.1:3001']) corsOrigins.add(origin)
+app.use(cors({
+  origin: (origin, cb) => cb(null, !origin || corsOrigins.has(origin)),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-project-id', 'x-dkit-actor', 'x-session-token', 'x-csrf-token', 'x-dkit-client'],
+}))
 app.use(express.json())
 const PORT = process.env.PORT || 3001
 const clientIp = (req) => req.headers['cf-connecting-ip'] || req.ip || req.socket.remoteAddress || ''
 
 async function issueSession(userId, req) {
-  const token = generateToken(userId)
   const refreshToken = newRefreshToken()
-  await pool.query(
-    'INSERT INTO sessions (user_id, refresh_hash, user_agent, last_ip) VALUES ($1, $2, $3, $4)',
+  const inserted = await pool.query(
+    'INSERT INTO sessions (user_id, refresh_hash, user_agent, last_ip) VALUES ($1, $2, $3, $4) RETURNING id',
     [userId, hashRefreshToken(refreshToken), String(req.headers['user-agent'] || '').slice(0, 300), clientIp(req)]
   )
-  return { token, refresh_token: refreshToken }
+  const sessionId = inserted.rows[0].id
+  return { token: generateToken(userId, sessionId), refresh_token: refreshToken, session_id: sessionId }
+}
+
+function sendSession(req, res, session, user, extra = {}) {
+  setSessionCookies(res, session.refresh_token)
+  res.json({
+    ...extra,
+    user,
+    token: session.token,
+    ...(wantsCliToken(req) ? { refresh_token: session.refresh_token } : {}),
+  })
 }
 const globalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false, skip: (req) => req.originalUrl.startsWith('/api/kv'), message: { error: 'Too many requests. Please slow down.' } })
 app.use('/api/', globalLimiter)
@@ -97,7 +138,7 @@ d8              .d888888
 88              d88888888
 8888888888888888888888888
 `
-  res.json({ status: 'ok', service: 'Dkit API', version: '0.3.0', ascii })})
+  res.json({ status: 'ok', service: 'Dkit API', version: '2.0.0', ascii })})
 app.get('/health', (req, res) => { res.redirect(302, '/api/health?force=true') })
 app.get('/install.sh', (req, res) => { res.type('text/x-shellscript').sendFile(path.join(__dirname, '../../install.sh')) })
 
@@ -153,11 +194,10 @@ const code = crypto.randomInt(100000, 999999).toString()
 await pool.query('INSERT INTO email_verifications (user_id, code) VALUES ($1, $2)', [result.rows[0].id, code])
 const sent = await sendVerificationCode(email, code)
 if (!sent) return res.status(502).json({ error: 'Could not send the verification email. Check server logs.' })
-const token = generateToken(result.rows[0].id)
-const refresh_token = (await issueSession(result.rows[0].id, req)).refresh_token
+const session = await issueSession(result.rows[0].id, req)
 await pool.query('UPDATE users SET last_ip = $1, last_login_at = NOW() WHERE id = $2', [clientIp(req), result.rows[0].id]).catch(() => {})
 sendWelcomeEmail(email).catch(() => {})
-res.json({ user: result.rows[0], token, refresh_token, message: 'Welcome to Dkit. Verification code sent to your email.' })
+sendSession(req, res, session, result.rows[0], { message: 'Welcome to Dkit. Verification code sent to your email.' })
 } catch (err) {
 if (err.code === '23505') return res.status(400).json({ error: 'Email already exists' })
 res.status(500).json({ error: 'Something went wrong' })
@@ -202,21 +242,18 @@ if (challenge.rows.length > 0) {
   if (!ok) return res.status(400).json({ error: 'Invalid or expired code' })
   const claimed = await pool.query('DELETE FROM login_challenges WHERE login_token = $1 AND expires_at > NOW() RETURNING user_id', [login_token])
   if (claimed.rows.length === 0) return res.status(400).json({ error: 'Invalid or expired code' })
-  const token = generateToken(uid)
-  const refreshToken = newRefreshToken()
-  await pool.query('INSERT INTO sessions (user_id, refresh_hash, user_agent, last_ip) VALUES ($1, $2, $3, $4)', [uid, hashRefreshToken(refreshToken), String(req.headers['user-agent'] || '').slice(0, 300), clientIp(req)])
+  const session = await issueSession(uid, req)
   await pool.query('UPDATE users SET last_ip = $1, last_login_at = NOW() WHERE id = $2', [clientIp(req), uid]).catch(() => {})
-  return res.json({ user: { id: u.rows[0].id, email: u.rows[0].email }, token, refresh_token: refreshToken, message: 'Login successful' })
+  return sendSession(req, res, session, { id: u.rows[0].id, email: u.rows[0].email }, { message: 'Login successful' })
 }
 const result = await pool.query(`SELECT user_id FROM login_codes WHERE login_token = $1 AND code = $2 AND expires_at > NOW()`, [login_token, code])
 if (result.rows.length === 0) return res.status(400).json({ error: 'Invalid or expired code' })
 const user = await pool.query('SELECT id, email, suspended FROM users WHERE id = $1', [result.rows[0].user_id])
 if (user.rows[0].suspended) return res.status(403).json({ error: 'Account suspended', code: 'suspended' })
-const token = generateToken(user.rows[0].id)
-const refresh_token = (await issueSession(user.rows[0].id, req)).refresh_token
+const session = await issueSession(user.rows[0].id, req)
 await pool.query('DELETE FROM login_codes WHERE login_token = $1', [login_token])
 await pool.query('UPDATE users SET last_ip = $1, last_login_at = NOW() WHERE id = $2', [clientIp(req), user.rows[0].id]).catch(() => {})
-res.json({ user: { id: user.rows[0].id, email: user.rows[0].email }, token, refresh_token, message: 'Login successful' })
+sendSession(req, res, session, { id: user.rows[0].id, email: user.rows[0].email }, { message: 'Login successful' })
 })
 app.post('/api/auth/send-verification', emailLimiter, authenticate, async (req, res) => {
 const userId = req.user.id
@@ -350,12 +387,13 @@ app.delete('/api/projects/:id/api-key', authenticate, async (req, res) => {
 
 app.get('/api/auth/sessions', authenticate, async (req, res) => {
   const currentHash = req.get('x-session-token') ? hashRefreshToken(String(req.get('x-session-token'))) : null
+  const current = req.sessionId || currentHash
   const r = await pool.query(
     `SELECT id, user_agent, last_ip, created_at, last_used_at, expires_at,
-            (refresh_hash = $2) AS current
+            (${req.sessionId ? 'id = $2' : 'refresh_hash = $2'}) AS current
      FROM sessions WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
      ORDER BY last_used_at DESC LIMIT 50`,
-    [req.user.id, currentHash]
+    [req.user.id, current]
   )
   res.json(r.rows)
 })
@@ -368,9 +406,15 @@ app.delete('/api/auth/sessions/:id', authenticate, async (req, res) => {
 })
 
 app.post('/api/auth/sessions/revoke-others', authenticate, async (req, res) => {
-  const currentHash = req.get('x-session-token') ? hashRefreshToken(String(req.get("x-session-token"))) : null
-  if (!currentHash) return res.status(400).json({ error: 'x-session-token header required' })
-  const r = await pool.query('UPDATE sessions SET revoked_at = NOW() WHERE user_id = $1 AND refresh_hash <> $2 AND revoked_at IS NULL RETURNING id', [req.user.id, currentHash])
+  const currentHash = req.get('x-session-token') ? hashRefreshToken(String(req.get('x-session-token'))) : null
+  const current = req.sessionId || currentHash
+  if (!current) return res.status(400).json({ error: 'A current session is required' })
+  const r = await pool.query(
+    `UPDATE sessions SET revoked_at = NOW()
+     WHERE user_id = $1 AND ${req.sessionId ? 'id <> $2' : 'refresh_hash <> $2'} AND revoked_at IS NULL
+     RETURNING id`,
+    [req.user.id, current]
+  )
   res.json({ ok: true, revoked: r.rowCount })
 })
 app.get('/api/auth/session', authenticate, async (req, res) => {
@@ -381,29 +425,46 @@ app.get('/api/auth/session', authenticate, async (req, res) => {
 })
 
 app.post('/api/auth/refresh', loginLimiter, async (req, res) => {
-  const { refresh_token } = req.body
-  if (!refresh_token) return res.status(400).json({ error: 'refresh_token required' })
-  const hash = hashRefreshToken(String(refresh_token))
+  const cookieToken = parseCookies(req.headers.cookie)[REFRESH_COOKIE]
+  if (cookieToken && !csrfIsValid(req)) return res.status(403).json({ error: 'Request rejected', code: 'csrf_failed' })
+  const provided = cookieToken || req.body?.refresh_token
+  if (!provided) return res.status(400).json({ error: 'Invalid or expired session. Please log in again.', code: 'session_invalid' })
+  const hash = hashRefreshToken(String(provided))
+  const nextToken = newRefreshToken()
   const r = await pool.query(
-    `UPDATE sessions s SET last_used_at = NOW(), last_ip = $2
+    `UPDATE sessions s SET
+       prev_refresh_hash = s.refresh_hash,
+       prev_valid_until = NOW() + INTERVAL '30 seconds',
+       refresh_hash = $2,
+       last_used_at = NOW(), last_ip = $3
      FROM users u
-     WHERE s.refresh_hash = $1 AND s.user_id = u.id
+     WHERE (s.refresh_hash = $1 OR (s.prev_refresh_hash = $1 AND s.prev_valid_until > NOW()))
+       AND s.user_id = u.id
        AND s.revoked_at IS NULL AND s.expires_at > NOW() AND NOT u.suspended
-     RETURNING s.user_id, u.email`,
-    [hash, clientIp(req)]
+     RETURNING s.id, s.user_id, u.email`,
+    [hash, hashRefreshToken(nextToken), clientIp(req)]
   )
-  if (r.rows.length === 0) return res.status(401).json({ error: 'Invalid or expired session. Please log in again.', code: 'session_invalid' })
-  const { user_id, email } = r.rows[0]
-  const newToken = newRefreshToken()
-  await pool.query('UPDATE sessions SET refresh_hash = $2 WHERE refresh_hash = $1', [hash, hashRefreshToken(newToken)])
-  res.json({ token: generateToken(user_id), refresh_token: newToken, user: { id: user_id, email } })
+  if (r.rows.length === 0) {
+    if (cookieToken) clearSessionCookies(res)
+    return res.status(401).json({ error: 'Invalid or expired session. Please log in again.', code: 'session_invalid' })
+  }
+  const { id, user_id, email } = r.rows[0]
+  if (cookieToken) setSessionCookies(res, nextToken, parseCookies(req.headers.cookie)[CSRF_COOKIE])
+  res.json({
+    token: generateToken(user_id, id),
+    user: { id: user_id, email },
+    ...(wantsCliToken(req) ? { refresh_token: nextToken } : {}),
+  })
 })
 
 app.post('/api/auth/logout', async (req, res) => {
-  const { refresh_token } = req.body || {}
-  if (refresh_token) {
-    await pool.query('UPDATE sessions SET revoked_at = NOW() WHERE refresh_hash = $1 AND revoked_at IS NULL', [hashRefreshToken(String(refresh_token))])
+  const cookieToken = parseCookies(req.headers.cookie)[REFRESH_COOKIE]
+  if (cookieToken && !csrfIsValid(req)) return res.status(403).json({ error: 'Request rejected', code: 'csrf_failed' })
+  const provided = cookieToken || req.body?.refresh_token
+  if (provided) {
+    await pool.query('UPDATE sessions SET revoked_at = NOW() WHERE refresh_hash = $1 AND revoked_at IS NULL', [hashRefreshToken(String(provided))])
   }
+  clearSessionCookies(res)
   res.json({ ok: true })
 })
 app.post('/api/projects', authenticate, async (req, res) => {
@@ -1201,10 +1262,9 @@ if (banned.rows[0]?.totp_enabled) {
   await pool.query('INSERT INTO login_challenges (login_token, user_id) VALUES ($1, $2)', [loginToken, user.id])
   return res.redirect(redirectBase + '/login?challenge=' + loginToken)
 }
-const token = generateToken(user.id)
-const refresh_token = (await issueSession(user.id, req)).refresh_token
-const payload = encodeURIComponent(JSON.stringify({ id: user.id, email: user.email, refresh_token }))
-res.redirect(redirectBase + '/oauth/callback#token=' + token + '&user=' + payload)
+const session = await issueSession(user.id, req)
+setSessionCookies(res, session.refresh_token)
+res.redirect(redirectBase + '/oauth/callback')
 } catch (err) { console.error('OAuth callback error:', err); res.redirect(failUrl) }
 })
 const STAT_WEEKS = 12
@@ -1640,7 +1700,7 @@ app.get('/api/overview', authenticate, async (req, res) => {
 })
 
 const websiteDist = path.join(__dirname, '../../website/dist')
-app.use(express.static(websiteDist, { setHeaders: (res) => { res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); res.setHeader('Access-Control-Allow-Origin', '*'); } }));
+app.use(express.static(websiteDist, { setHeaders: (res) => { res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate'); } }));
 app.use((req, res, next) => { if (req.path.startsWith('/api/')) return next(); res.sendFile(path.join(websiteDist, 'index.html')) })
 ;(async () => {
   await initPromise

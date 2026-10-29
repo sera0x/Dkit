@@ -81,7 +81,14 @@
 }
 
 .docs-block a {
-  color: var(--accent);
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border-strong);
+}
+
+.docs-block a:hover {
+  text-decoration-color: var(--text);
 }
 
 .docs-code {
@@ -89,7 +96,7 @@
   margin: 0.9rem 0;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
 }
 

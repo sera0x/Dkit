@@ -87,10 +87,11 @@ export default function Docs({ onNavigate }) {
         <PageHeader
           Icon={BookOpen}
           title="Docs"
-          subtitle="Secrets, cron, monitors, logs. From one CLI or a plain HTTP API."
+          subtitle="Secrets and runtime config, from one CLI or a plain HTTP API."
         />
         <p className="docs-lead">
-          Secrets, cron, monitors, and a log drain, from one CLI or a plain HTTP API.
+          Keep secrets per environment, inject them at runtime, and audit what changed.
+          Cron, monitors, and logs are there when you need them.
         </p>
 
         <div className="docs-block">
@@ -123,6 +124,17 @@ dkit logs:ship "it's alive"`}</CodeBlock>
             <li><code>Store</code>: a JSON key-value store for app data (counters, sessions, anything small).</li>
             <li><code>API key</code>: the <code>dk_...</code> key that authenticates project calls from your code. The dashboard itself uses your login session; keys are hashed at rest and shown once.</li>
             <li><code>Encryption</code>: env values and env history are AES-256-GCM encrypted at rest with <code>DKIT_ENCRYPTION_KEY</code>. Rotating or losing that key makes stored values unreadable unless you re-encrypt them first.</li>
+          </ul>
+        </div>
+
+        <div className="docs-block">
+          <h2 id="security">Security</h2>
+          <ul>
+            <li><strong>At rest:</strong> env values, env history, and TOTP secrets use AES-256-GCM with a dedicated <code>DKIT_ENCRYPTION_KEY</code>. Back that key up with Postgres; without both, the values cannot be recovered.</li>
+            <li><strong>API keys:</strong> project keys and refresh tokens are stored as SHA-256 hashes. The plaintext is returned once when a key is created or rotated.</li>
+            <li><strong>Browser sessions:</strong> the refresh token lives in an httpOnly, SameSite=Lax cookie scoped to <code>/api/auth</code>. The access token stays in memory, and refresh and logout require a CSRF token.</li>
+            <li><strong>Headers:</strong> the API sends a restrictive Content-Security-Policy, <code>frame-ancestors 'none'</code>, and a same-origin referrer policy. CORS only accepts the configured <code>PUBLIC_URL</code> and local development origins.</li>
+            <li><strong>Reporting:</strong> use GitHub private vulnerability reporting. Do not include live credentials in a report.</li>
           </ul>
         </div>
 

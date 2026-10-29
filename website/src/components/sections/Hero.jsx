@@ -1,41 +1,93 @@
 import React, { useState } from 'react';
-import Orb from '../ui/Orb';
+import { ArrowRight, Copy, Check } from 'lucide-react';
 import logo from '../../assets/dkit-logo.png';
 import DashboardShot from '../ui/DashboardShot';
-import Shuffle from '../ui/Shuffle';
 import { useAuth } from '../../context/AuthContext';
-import { MarketingThemeContext } from '../app/MarketingShell';
 import './sections.css';
+
 const INSTALL_CMD = 'curl -fsSL https://dkit.name.ng/install.sh | sh';
+
+const NAV = [
+  { href: '#product', label: 'Product' },
+  { href: '#security', label: 'Security' },
+  { href: '#cli', label: 'CLI' },
+  { href: '/docs', label: 'Docs' },
+  { href: '/changelog', label: 'Changelog' },
+];
+
 const Hero = ({ onNavigate }) => {
-const { user } = useAuth();
-const theme = React.useContext(MarketingThemeContext);
-const [copied, setCopied] = useState(false);
-const copy = () => { navigator.clipboard?.writeText(INSTALL_CMD); setCopied(true); setTimeout(() => setCopied(false), 1500); };
-const getStarted = () => { const target = user ? '/dashboard' : '/signup'; onNavigate ? onNavigate(target) : (window.location.href = target); };
-return (
-<section className="hero-section" id="top">
-<button className="navbar-brand hero-brand-btn" onClick={() => (onNavigate ? onNavigate("/") : (window.location.href = "/"))}><img src={logo} alt="Dkit logo" className="navbar-logo" /><span>Dkit</span></button>
-<button className="cta-button ghost hero-account-btn" onClick={() => { const t = user ? "/dashboard" : "/login"; onNavigate ? onNavigate(t) : (window.location.href = t); }}>{user ? "dashboard" : "dkit login"}</button>
-<div className="hero-glow">
-  <Orb hue={151} hoverIntensity={0.5} rotateOnHover={true}
-    backgroundColor={theme === 'light' ? '#ffffff' : '#000000'} />
-</div>
-<div className="hero-grid">
-<div className="hero-copy hero-seq">
-<Shuffle text="Secrets, scaffolding, one CLI." shuffleDirection="right" duration={0.5} shuffleTimes={2} ease="power3.out" triggerOnce={true} triggerOnHover={true} tag="h1" textAlign="left" />
-<div className="hero-subtitle"><p>Scaffold an Express + Postgres backend, keep env vars per environment, and run anything with secrets injected into the process. No .env file on disk.</p></div>
-<div className="hero-ctas"><button className="cta-button primary" onClick={getStarted}>Get Started</button></div>
-<div className="hero-install">
-<button className="install-line" onClick={copy}><span>$ {INSTALL_CMD}</span><span className="install-copy">{copied ? 'copied' : 'copy'}</span></button>
-<a href="#demo" className="hero-secondary-link">see it run ↓</a>
-</div>
-</div>
-<div className="hero-terminal-wrap">
-<DashboardShot />
-</div>
-</div>
-</section>
-);
+  const { user } = useAuth();
+  const [copied, setCopied] = useState(false);
+
+  const go = (path) => (event) => {
+    if (event) event.preventDefault();
+    if (onNavigate) onNavigate(path);
+    else window.location.href = path;
+  };
+
+  const copy = () => {
+    navigator.clipboard?.writeText(INSTALL_CMD);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
+
+  return (
+    <div className="home">
+      <header className="home-header">
+        <div className="home-header-inner">
+          <button className="home-brand" onClick={go('/')} aria-label="Dkit home">
+            <img src={logo} alt="" className="home-logo" />
+            <span>Dkit</span>
+          </button>
+          <nav className="home-nav" aria-label="Main">
+            {NAV.map((item) => (
+              item.href.startsWith('#')
+                ? <a key={item.href} href={item.href}>{item.label}</a>
+                : <a key={item.href} href={item.href} onClick={go(item.href)}>{item.label}</a>
+            ))}
+          </nav>
+          <div className="home-actions">
+            <a className="home-github" href="https://github.com/sera0x/Dkit" rel="noopener">GitHub</a>
+            <button className="btn btn-ghost btn-sm" onClick={go(user ? '/dashboard' : '/login')}>
+              {user ? 'Dashboard' : 'Sign in'}
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={go(user ? '/dashboard' : '/signup')}>
+              Get started
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <section className="hero" id="top">
+        <div className="hero-grid">
+          <div className="hero-copy">
+            <h1>Secrets without the .env file.</h1>
+            <p className="hero-sub">
+              Dkit keeps each project's secrets per environment, encrypts them at rest,
+              and injects them into your process when it starts. Your repo stays clean,
+              and a leaked checkout leaks nothing.
+            </p>
+            <div className="hero-ctas">
+              <button className="btn btn-primary" onClick={go(user ? '/dashboard' : '/signup')}>
+                Create free account
+                <ArrowRight width="16" height="16" />
+              </button>
+              <a className="btn btn-ghost" href="#cli">See the CLI</a>
+            </div>
+            <button className="install-line" onClick={copy} title="Copy install command">
+              <span className="install-prompt">$</span>
+              <code>{INSTALL_CMD}</code>
+              <span className="install-copy">{copied ? <Check width="14" height="14" /> : <Copy width="14" height="14" />}</span>
+            </button>
+            <p className="hero-note">Open source. Self-hosted. AES-256-GCM at rest.</p>
+          </div>
+          <div className="hero-shot">
+            <DashboardShot />
+          </div>
+        </div>
+      </section>
+    </div>
+  );
 };
+
 export default Hero;

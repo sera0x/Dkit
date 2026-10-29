@@ -64,7 +64,7 @@ export default function Login({ onNavigate }) {
     setSubmitting(true);
     try {
       const data = await api.loginVerify(loginToken, value);
-      login(data.user, data.token, data.refresh_token);
+      login(data.user, data.token);
       goTo('/dashboard');
     } catch (err) {
       submittingRef.current = false;
@@ -84,7 +84,7 @@ export default function Login({ onNavigate }) {
     setSubmitting(true);
     try {
       const data = await api.loginVerify(loginToken, v);
-      login(data.user, data.token, data.refresh_token);
+      login(data.user, data.token);
       goTo('/dashboard');
     } catch (err) {
       submittingRef.current = false;

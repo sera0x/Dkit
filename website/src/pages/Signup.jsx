@@ -14,7 +14,6 @@ export default function Signup({ onNavigate }) {
   const submittingRef = useRef(false);
   const [pendingUser, setPendingUser] = useState(null);
   const [pendingToken, setPendingToken] = useState('');
-  const [pendingRefresh, setPendingRefresh] = useState('');
   const [error, setError] = useState('');
   const [errorList, setErrorList] = useState([]);
   const [resendMsg, setResendMsg] = useState('');
@@ -46,7 +45,6 @@ export default function Signup({ onNavigate }) {
       const data = await api.signup(email, password);
       setPendingUser(data.user);
       setPendingToken(data.token);
-      setPendingRefresh(data.refresh_token || '');
       setStep('verify');
     } catch (err) {
       setError(err.message || 'Signup failed');
@@ -63,7 +61,7 @@ export default function Signup({ onNavigate }) {
     setSubmitting(true);
     try {
       await api.verifyEmail(pendingToken, value);
-      login(pendingUser, pendingToken, pendingRefresh);
+      login(pendingUser, pendingToken);
       goTo('/dashboard');
     } catch (err) {
       submittingRef.current = false;

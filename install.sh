@@ -17,12 +17,15 @@ need curl
 need tar
 need node
 
+node_major=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)
+[ "$node_major" -ge 18 ] 2>/dev/null || fail "Node 18 or newer is required (found $(node -v 2>/dev/null || echo 'none'))"
+
 version="${1:-}"
 if [ -z "$version" ]; then
   echo "dkit: looking up the latest release..."
   tag=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
     | grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
-  [ -n "$tag" ] || fail "couldn't determine the latest release; pass a version explicitly, e.g. install.sh v0.3.0"
+  [ -n "$tag" ] || fail "couldn't determine the latest release; pass a version explicitly, e.g. install.sh v2.0.0"
 else
   case "$version" in
     v*) tag="$version" ;;

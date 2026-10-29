@@ -5,6 +5,20 @@ import './changelog.css';
 
 const ENTRIES = [
   {
+    version: 'v2.0',
+    title: 'Safer sessions, sharper product',
+    items: [
+      'Browser auth: refresh token moved to an httpOnly, SameSite=Lax cookie; access token stays in memory',
+      'CSRF double-submit protection on refresh and logout, with a 30-second rotation grace for concurrent tabs',
+      'Content-Security-Policy enabled and CORS limited to PUBLIC_URL plus local development origins',
+      'Project API keys in the dashboard now live in tab memory only, never localStorage',
+      'Redesigned marketing site and dashboard chrome: graphite palette, sans-serif UI, self-hosted fonts, no decorative 3D',
+      'Positioning narrowed to secrets and runtime config; cron, monitors, and logs are secondary',
+      'CLI 2.0: `env:set` now defaults to production like the rest of the env commands',
+      'Dependency audit: zero known vulnerabilities in backend and website production trees',
+    ],
+  },
+  {
     version: 'v0.5',
     title: 'Cron jobs, monitors, log drain',
     items: [

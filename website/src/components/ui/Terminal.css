@@ -1,7 +1,7 @@
 .terminal-window {
-  background: #000000;
+  background: #0d0f12;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
   font-family: var(--font-mono);
 }
@@ -11,7 +11,7 @@
   align-items: center;
   gap: 0.4rem;
   padding: 0.75rem 1rem;
-  background: #0c0c0c;
+  background: #14171b;
   border-bottom: 1px solid var(--border);
 }
 
@@ -36,7 +36,7 @@
 .terminal-titlebar-label {
   margin-left: 0.5rem;
   font-size: 0.75rem;
-  color: rgba(242, 241, 247, 0.5);
+  color: var(--text-faint);
 }
 
 .terminal-body {
@@ -46,7 +46,7 @@
   overflow-y: auto;
   font-size: 0.85rem;
   line-height: 1.7;
-  color: rgba(242, 241, 247, 0.9);
+  color: var(--text);
 }
 
 .terminal-line {

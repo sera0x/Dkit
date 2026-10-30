@@ -19,8 +19,6 @@
 
 Dkit replaces the `.env` file you copy between machines, paste into chat, and eventually commit by mistake. Values live per project and environment, are encrypted at rest, and are injected into your process when it starts. The `dkit` CLI, the React dashboard, and the plain HTTP API all talk to the same backend.
 
-Cron jobs, uptime monitors, and a log drain live in the same box. They are useful, but you do not need them to use the secrets part.
-
 ```bash
 curl -fsSL https://dkit.name.ng/install.sh | sh
 ```
@@ -60,12 +58,7 @@ Set `PUBLIC_URL` in `backend/.env` to your public origin, and build the dashboar
 - **Teams.** Owner/admin/member roles, projects shared into a team, invitations that only work for a verified address.
 - **Destructive actions type-to-confirm.** Projects and secrets confirm through a prompt, like a terminal.
 
-The rest of the box, when you want it:
-
-- **Cron is human strings.** `30s`, `5m`, `daily 09:30`, `mon 09:00`, all UTC, 10-second floor. The API fires the HTTP calls, keeps run history, and can pause or run a job on demand.
-- **Monitors email once.** One alert when a URL goes down, one when it recovers. Granularity from 30 seconds to an hour.
-- **Log drain accepts anything that can POST.** Ship lines or JSON batches; tail with level and search filters; 7-day retention.
-- **Also from the CLI:** a JSON key-value store with TTL and atomic increments, a deliberately evictable Redis cache, and R2-backed media uploads with temporary share links.
+Cron jobs, uptime monitors, log drain, a JSON key-value store, a Redis cache, and R2 media uploads are available from the same API and CLI. They are secondary to secrets; the full reference is at `/docs`.
 
 ## How it fits together
 

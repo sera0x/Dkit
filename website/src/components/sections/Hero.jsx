@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { ArrowRight, Copy, Check } from 'lucide-react';
-import logo from '../../assets/dkit-logo.png';
-import DashboardShot from '../ui/DashboardShot';
+import logo from '../../assets/dkit-mark.png';
+import Orb from '../ui/Orb';
 import { useAuth } from '../../context/AuthContext';
+import { MarketingThemeContext } from '../app/MarketingShell';
 import './sections.css';
 
 const INSTALL_CMD = 'curl -fsSL https://dkit.name.ng/install.sh | sh';
@@ -17,6 +18,7 @@ const NAV = [
 
 const Hero = ({ onNavigate }) => {
   const { user } = useAuth();
+  const theme = useContext(MarketingThemeContext);
   const [copied, setCopied] = useState(false);
 
   const go = (path) => (event) => {
@@ -81,8 +83,13 @@ const Hero = ({ onNavigate }) => {
             </button>
             <p className="hero-note">Open source. Self-hosted. AES-256-GCM at rest.</p>
           </div>
-          <div className="hero-shot">
-            <DashboardShot />
+          <div className="hero-orb" aria-hidden="true">
+            <Orb
+              hue={151}
+              hoverIntensity={0.5}
+              rotateOnHover
+              backgroundColor={theme === 'light' ? '#f7f7f4' : '#0c0e11'}
+            />
           </div>
         </div>
       </section>

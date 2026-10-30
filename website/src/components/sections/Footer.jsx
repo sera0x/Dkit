@@ -1,5 +1,5 @@
 import React from 'react';
-import logo from '../../assets/dkit-logo.png';
+import logo from '../../assets/dkit-mark.png';
 import './sections.css';
 
 const Footer = ({ onNavigate }) => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Menu, X } from 'lucide-react';
-import logo from '../../assets/dkit-logo.png';
+import logo from '../../assets/dkit-mark.png';
 import { useAuth } from '../../context/AuthContext';
 import './sections.css';
 

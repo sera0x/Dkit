@@ -252,14 +252,25 @@
   color: var(--text-faint);
 }
 
-.hero-shot { min-width: 0; }
+.hero-orb {
+  position: relative;
+  width: 100%;
+  max-width: 32rem;
+  aspect-ratio: 1;
+  justify-self: center;
+}
+
+.hero-orb .orb-container {
+  position: absolute;
+  inset: 0;
+}
 
 .hero-copy > * { animation: rise var(--duration-slow) var(--ease-smooth-out) backwards; }
 .hero-copy > *:nth-child(2) { animation-delay: 60ms; }
 .hero-copy > *:nth-child(3) { animation-delay: 120ms; }
 .hero-copy > *:nth-child(4) { animation-delay: 180ms; }
 .hero-copy > *:nth-child(5) { animation-delay: 240ms; }
-.hero-shot { animation: rise var(--duration-slow) var(--ease-smooth-out) 100ms backwards; }
+.hero-orb { animation: rise var(--duration-slow) var(--ease-smooth-out) 100ms backwards; }
 
 @keyframes rise {
   from { opacity: 0; transform: translateY(10px); }
@@ -267,7 +278,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-copy > *, .hero-shot { animation: none; }
+  .hero-copy > *, .hero-orb { animation: none; }
 }
 
 .section {
@@ -760,6 +771,7 @@
 @media (max-width: 60rem) {
   .hero-grid { grid-template-columns: 1fr; gap: 3rem; }
   .hero-copy h1 { max-width: 16ch; }
+  .hero-orb { max-width: 24rem; }
   .cli-inner { grid-template-columns: 1fr; gap: 2.5rem; }
   .also-grid { grid-template-columns: 1fr 1fr; gap: 1.5rem 0; }
   .also-grid > div:nth-child(3) { padding-left: 0; border-left: none; }
@@ -791,6 +803,7 @@
 @media (max-width: 34rem) {
   .home-github { display: none; }
   .hero-copy h1 { font-size: clamp(2.2rem, 10vw, 2.9rem); }
+  .hero-orb { max-width: 18rem; }
   .hero-ctas .btn { flex: 1; }
   .install-line code { font-size: 0.68rem; }
   .also-grid { grid-template-columns: 1fr; }

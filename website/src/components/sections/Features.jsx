@@ -42,6 +42,7 @@ const Features = () => (
   <section className="section product" id="product">
     <div className="section-inner">
       <div className="section-head">
+        <p className="section-eyebrow">Product</p>
         <h2>The .env file is the weak link.</h2>
         <p>
           It gets copied between machines, pasted into chat, and committed by mistake.

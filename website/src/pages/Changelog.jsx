@@ -12,7 +12,7 @@ const ENTRIES = [
       'CSRF double-submit protection on refresh and logout, with a 30-second rotation grace for concurrent tabs',
       'Content-Security-Policy enabled and CORS limited to PUBLIC_URL plus local development origins',
       'Project API keys in the dashboard now live in tab memory only, never localStorage',
-      'Redesigned marketing site and dashboard chrome: graphite palette, sans-serif UI, self-hosted fonts, one restrained WebGL orb in the hero',
+      'Redesigned marketing site and dashboard chrome: graphite palette, sans-serif UI, self-hosted fonts, a centered hero over a two-tone particle orb',
       'Light and dark themes now cross over with a circular reveal from the toggle, disabled under reduced motion',
       'Positioning narrowed to secrets and runtime config; cron, monitors, and logs are secondary',
       'CLI 2.0: `env:set` now defaults to production like the rest of the env commands',

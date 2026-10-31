@@ -36,6 +36,7 @@ const Security = ({ onNavigate }) => {
     <section className="section security" id="security">
       <div className="section-inner">
         <div className="section-head">
+          <p className="section-eyebrow">Security</p>
           <h2>Built for what you're trusting it with.</h2>
           <p>
             Dkit is small on purpose. There are few moving parts between a secret and the
